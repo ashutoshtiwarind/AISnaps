@@ -3,16 +3,18 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
+  FlatList,
+  Image,
+  Modal,
   PanResponder,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import {
   Camera,
@@ -22,17 +24,18 @@ import {
 import { useAICoach } from "../hooks/useAICoach";
 import { SCRIPTS } from "../scripts/scripts";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
+const THUMB_SIZE = (width - 48) / 3;
 
 export default function HomeScreen() {
   const cameraRef = useRef<Camera>(null);
   const [facing, setFacing] = useState<"back" | "front">("back");
   const device = useCameraDevice(facing);
   const { hasPermission, requestPermission } = useCameraPermission();
-  const [mediaLibraryPermission, requestMediaLibraryPermission] = MediaLibrary.usePermissions();
+  const [mediaLibraryPermission, requestMediaLibraryPermission] =
+    MediaLibrary.usePermissions();
 
-// Add inside your component
-const isFocused = useIsFocused();
+  const isFocused = useIsFocused();
 
   // UI state
   const [activeScript, setActiveScript] = useState(0);
@@ -46,8 +49,16 @@ const isFocused = useIsFocused();
   const [threshold, setThreshold] = useState(88);
   const [toastMsg, setToastMsg] = useState("");
 
+  // Gallery state
+  const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
+  const [galleryVisible, setGalleryVisible] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+
   // Focus ring
-  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
+  const [focusPoint, setFocusPoint] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const focusAnim = useRef(new Animated.Value(1)).current;
 
   // Exposure slider
@@ -73,103 +84,74 @@ const isFocused = useIsFocused();
 
   useEffect(() => {
     const requestPerms = async () => {
-      console.log("Requesting camera permission...");
       await requestPermission();
-      
-      console.log("Requesting media library permission...");
       if (mediaLibraryPermission?.status !== "granted") {
         await requestMediaLibraryPermission();
       }
-      
-      console.log("Requesting image picker permissions...");
-      const pickerStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log("Image picker permission status:", pickerStatus.status);
     };
     requestPerms();
   }, []);
 
-  // Auto-fire trigger
-
-
-  // const capture = useCallback(
-  //   async (isAuto = false) => {
-  //     try {
-  //       if (!cameraRef.current || !device) {
-  //         console.log("Camera not ready yet");
-  //         return;
-  //       }
-  //       const photo = await cameraRef.current.takePhoto({
-  //         flash: flashOn ? "on" : "off",
-  //       });
-  //       setCaptureCount((c) => c + 1);
-  //       setToastMsg(isAuto ? `Auto shot! (score: ${Math.round(score)})` : `Photo saved ✓`);
-  //       setShowToast(true);
-  //       setTimeout(() => setShowToast(false), 2000);
-  //     } catch (e) {
-  //       console.log("capture error", e);
-  //     }
-  //   },
-  //   [flashOn, score, device]
-  // );
-
-  // Replace your capture function with this:
-const capture = useCallback(async (isAuto = false) => {
-  try {
-    if (!cameraRef.current) return;
-    
-    const photo = await cameraRef.current.takePhoto({
-      flash: flashOn ? "on" : "off",
-    });
-
-    const asset = await MediaLibrary.createAssetAsync("file://" + photo.path);
-    await MediaLibrary.addAssetsToAlbumAsync([asset], "SnapCoach", false);
-    
-    setCaptureCount((c) => c + 1);
-    setToastMsg(isAuto ? `Auto shot! Score: ${Math.round(score)}` : "Photo saved ✓");
+  const showToastMsg = useCallback((msg: string) => {
+    setToastMsg(msg);
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2000);
-  } catch (e: any) {
-    console.log("capture error:", e?.message);
-    setToastMsg("Failed to capture");
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 2000);
-  }
-}, [flashOn, score]);
+  }, []);
+
+  const capture = useCallback(
+    async (isAuto = false) => {
+      try {
+        if (!cameraRef.current) {
+          showToastMsg("Camera not ready");
+          return;
+        }
+
+        const photo = await cameraRef.current.takePhoto({
+          flash: flashOn ? "on" : "off",
+        });
+
+        const photoUri = "file://" + photo.path;
+
+        // Update UI immediately — don't wait for save
+        setCapturedPhotos((prev) => [photoUri, ...prev]);
+        setCaptureCount((c) => c + 1);
+        showToastMsg(
+          isAuto ? `Auto shot! Score: ${Math.round(score)}` : "Photo saved ✓"
+        );
+
+        // Save to device gallery in background
+        try {
+          if (mediaLibraryPermission?.status === "granted") {
+            const asset = await MediaLibrary.createAssetAsync(photoUri);
+            // copyAssets: true keeps photo in camera roll AND adds to SnapCoach album
+            await MediaLibrary.addAssetsToAlbumAsync([asset], "SnapCoach", true);
+          }
+        } catch (saveErr: any) {
+          console.log("Save to gallery error:", saveErr?.message);
+        }
+      } catch (e: any) {
+        console.log("Capture error:", e?.message);
+        showToastMsg("Capture failed: " + (e?.message ?? "unknown error"));
+      }
+    },
+    [flashOn, score, mediaLibraryPermission, showToastMsg]
+  );
 
   useEffect(() => {
     if (autoFire) {
       setShowAutoBadge(true);
-      capture(false);
+      capture(true);
       setTimeout(() => setShowAutoBadge(false), 2500);
     }
   }, [autoFire, capture]);
 
-  // Open gallery
-  const openGallery = useCallback(async () => {
-    try {
-      // Request permissions first
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status === "granted") {
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ["images"],
-          allowsEditing: false,
-          quality: 1,
-        });
-        if (result.assets && result.assets.length > 0) {
-          console.log("Selected image:", result.assets[0].uri);
-        }
-      } else {
-        setToastMsg("Photo library permission required");
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 2000);
-      }
-    } catch (e) {
-      console.log("Gallery error", e);
-      setToastMsg("Could not open gallery");
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 2000);
+  const openGallery = useCallback(() => {
+    if (capturedPhotos.length === 0) {
+      showToastMsg("No photos captured yet");
+      return;
     }
-  }, []);
+    setGalleryVisible(true);
+  }, [capturedPhotos, showToastMsg]);
 
   // Tap to focus
   const handleTap = useCallback(async (e: any) => {
@@ -183,7 +165,7 @@ const capture = useCallback(async (isAuto = false) => {
     }).start();
     setTimeout(() => setFocusPoint(null), 1200);
     try {
-      await cameraRef.current?.focusTo({ x, y });
+      await cameraRef.current?.focus({ x, y });
     } catch (_) {}
   }, []);
 
@@ -207,11 +189,6 @@ const capture = useCallback(async (isAuto = false) => {
       <View style={styles.center}>
         <Text style={{ color: "white", marginBottom: 16, fontSize: 14 }}>
           Camera permission required
-        </Text>
-        <Text style={{ color: "rgba(255,255,255,0.6)", marginBottom: 16, fontSize: 12, paddingHorizontal: 20 }}>
-          If you see "Camera is disabled due to device policy":
-          {"\n"}• Check Android emulator has camera enabled
-          {"\n"}• Or try a physical device
         </Text>
         <TouchableOpacity onPress={requestPermission} style={styles.permBtn}>
           <Text style={{ color: "white" }}>Grant Permission</Text>
@@ -238,7 +215,7 @@ const capture = useCallback(async (isAuto = false) => {
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
           device={device}
-          isActive={isFocused}
+          isActive={isFocused && !galleryVisible}
           photo={true}
           exposure={exposure}
         />
@@ -246,10 +223,18 @@ const capture = useCallback(async (isAuto = false) => {
         {/* Grid overlay */}
         {gridVisible && (
           <View style={styles.grid} pointerEvents="none">
-            <View style={[styles.gridLine, { top: "33.3%", width: "100%", height: 0.5 }]} />
-            <View style={[styles.gridLine, { top: "66.6%", width: "100%", height: 0.5 }]} />
-            <View style={[styles.gridLine, { left: "33.3%", height: "100%", width: 0.5 }]} />
-            <View style={[styles.gridLine, { left: "66.6%", height: "100%", width: 0.5 }]} />
+            <View
+              style={[styles.gridLine, { top: "33.3%", width: "100%", height: 0.5 }]}
+            />
+            <View
+              style={[styles.gridLine, { top: "66.6%", width: "100%", height: 0.5 }]}
+            />
+            <View
+              style={[styles.gridLine, { left: "33.3%", height: "100%", width: 0.5 }]}
+            />
+            <View
+              style={[styles.gridLine, { left: "66.6%", height: "100%", width: 0.5 }]}
+            />
             <View style={[styles.bracket, styles.tl]} />
             <View style={[styles.bracket, styles.tr]} />
             <View style={[styles.bracket, styles.bl]} />
@@ -275,14 +260,26 @@ const capture = useCallback(async (isAuto = false) => {
         {/* Top bar */}
         <View style={styles.topBar}>
           <View style={styles.modePill}>
-            <Text style={styles.modeText}>{SCRIPTS[activeScript].label.toUpperCase()}</Text>
+            <Text style={styles.modeText}>
+              {SCRIPTS[activeScript].label.toUpperCase()}
+            </Text>
           </View>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => setFlashOn((f) => !f)}>
-              <Text style={[styles.iconTxt, flashOn && { color: "#FFD700" }]}>⚡</Text>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => setFlashOn((f) => !f)}
+            >
+              <Text style={[styles.iconTxt, flashOn && { color: "#FFD700" }]}>
+                ⚡
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => setGridVisible((g) => !g)}>
-              <Text style={[styles.iconTxt, !gridVisible && { opacity: 0.3 }]}>▦</Text>
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => setGridVisible((g) => !g)}
+            >
+              <Text style={[styles.iconTxt, !gridVisible && { opacity: 0.3 }]}>
+                ▦
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -331,7 +328,9 @@ const capture = useCallback(async (isAuto = false) => {
                 ]}
               />
             </View>
-            <Text style={[styles.scoreNum, { color: scoreColor }]}>{Math.round(score)}</Text>
+            <Text style={[styles.scoreNum, { color: scoreColor }]}>
+              {Math.round(score)}
+            </Text>
           </View>
           <View style={styles.tipRow}>
             <View style={[styles.tipDot, { backgroundColor: scoreColor }]} />
@@ -389,7 +388,12 @@ const capture = useCallback(async (isAuto = false) => {
               style={[styles.scriptChip, i === activeScript && styles.scriptChipActive]}
               onPress={() => setActiveScript(i)}
             >
-              <Text style={[styles.scriptText, i === activeScript && styles.scriptTextActive]}>
+              <Text
+                style={[
+                  styles.scriptText,
+                  i === activeScript && styles.scriptTextActive,
+                ]}
+              >
                 {s.icon} {s.label}
               </Text>
             </TouchableOpacity>
@@ -398,8 +402,16 @@ const capture = useCallback(async (isAuto = false) => {
 
         {/* Controls row */}
         <View style={styles.controls}>
+          {/* Gallery button — shows last captured photo as thumbnail */}
           <TouchableOpacity style={styles.galleryBtn} onPress={openGallery}>
-            <Text style={{ fontSize: 22 }}>🖼</Text>
+            {capturedPhotos.length > 0 ? (
+              <Image
+                source={{ uri: capturedPhotos[0] }}
+                style={styles.galleryThumb}
+              />
+            ) : (
+              <Text style={{ fontSize: 22 }}>🖼</Text>
+            )}
             {captureCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{captureCount}</Text>
@@ -424,12 +436,73 @@ const capture = useCallback(async (isAuto = false) => {
 
           <TouchableOpacity
             style={styles.flipBtn}
-            onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}
+            onPress={() =>
+              setFacing((f) => (f === "back" ? "front" : "back"))
+            }
           >
             <Text style={{ fontSize: 22, color: "white" }}>↺</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* ── GALLERY MODAL ── */}
+      <Modal
+        visible={galleryVisible}
+        animationType="slide"
+        onRequestClose={() => setGalleryVisible(false)}
+      >
+        <View style={styles.galleryModal}>
+          <View style={styles.galleryHeader}>
+            <Text style={styles.galleryTitle}>
+              SnapCoach ({capturedPhotos.length})
+            </Text>
+            <TouchableOpacity
+              onPress={() => setGalleryVisible(false)}
+              style={styles.galleryClose}
+            >
+              <Text style={styles.galleryCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <FlatList
+            data={capturedPhotos}
+            numColumns={3}
+            keyExtractor={(item, i) => item + i}
+            contentContainerStyle={styles.galleryGrid}
+            columnWrapperStyle={{ gap: 4 }}
+            ItemSeparatorComponent={() => <View style={{ height: 4 }} />}
+            renderItem={({ item }) => (
+              <TouchableOpacity onPress={() => setSelectedPhoto(item)}>
+                <Image source={{ uri: item }} style={styles.gridThumb} />
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+
+        {/* Full-screen photo preview */}
+        {selectedPhoto && (
+          <Modal
+            visible={!!selectedPhoto}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSelectedPhoto(null)}
+          >
+            <View style={styles.fullscreenOverlay}>
+              <TouchableOpacity
+                style={styles.fullscreenClose}
+                onPress={() => setSelectedPhoto(null)}
+              >
+                <Text style={styles.galleryCloseText}>✕</Text>
+              </TouchableOpacity>
+              <Image
+                source={{ uri: selectedPhoto }}
+                style={styles.fullscreenImage}
+                resizeMode="contain"
+              />
+            </View>
+          </Modal>
+        )}
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -437,16 +510,48 @@ const capture = useCallback(async (isAuto = false) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0a0a0a" },
   viewfinder: { flex: 1, position: "relative" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
   permBtn: { backgroundColor: "#1A73E8", padding: 12, borderRadius: 8 },
 
   grid: { ...StyleSheet.absoluteFillObject },
-  gridLine: { position: "absolute", backgroundColor: "rgba(255,255,255,0.2)" },
+  gridLine: {
+    position: "absolute",
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
   bracket: { position: "absolute", width: 24, height: 24 },
-  tl: { top: 16, left: 16, borderTopWidth: 2, borderLeftWidth: 2, borderColor: "rgba(255,255,255,0.7)" },
-  tr: { top: 16, right: 16, borderTopWidth: 2, borderRightWidth: 2, borderColor: "rgba(255,255,255,0.7)" },
-  bl: { bottom: 16, left: 16, borderBottomWidth: 2, borderLeftWidth: 2, borderColor: "rgba(255,255,255,0.7)" },
-  br: { bottom: 16, right: 16, borderBottomWidth: 2, borderRightWidth: 2, borderColor: "rgba(255,255,255,0.7)" },
+  tl: {
+    top: 16,
+    left: 16,
+    borderTopWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: "rgba(255,255,255,0.7)",
+  },
+  tr: {
+    top: 16,
+    right: 16,
+    borderTopWidth: 2,
+    borderRightWidth: 2,
+    borderColor: "rgba(255,255,255,0.7)",
+  },
+  bl: {
+    bottom: 16,
+    left: 16,
+    borderBottomWidth: 2,
+    borderLeftWidth: 2,
+    borderColor: "rgba(255,255,255,0.7)",
+  },
+  br: {
+    bottom: 16,
+    right: 16,
+    borderBottomWidth: 2,
+    borderRightWidth: 2,
+    borderColor: "rgba(255,255,255,0.7)",
+  },
 
   focusRing: {
     position: "absolute",
@@ -474,7 +579,11 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "rgba(255,255,255,0.2)",
   },
-  modeText: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: "600" },
+  modeText: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 11,
+    fontWeight: "600",
+  },
   iconBtn: {
     width: 34,
     height: 34,
@@ -541,19 +650,58 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: "rgba(0,0,0,0.4)",
   },
-  scoreRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
-  scoreLabel: { fontSize: 10, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: 1 },
-  scoreTrack: { flex: 1, height: 4, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 2, overflow: "hidden" },
+  scoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  scoreLabel: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.5)",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  scoreTrack: {
+    flex: 1,
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
   scoreFill: { height: 4, borderRadius: 2 },
-  scoreNum: { fontSize: 14, fontWeight: "600", minWidth: 28, textAlign: "right" },
+  scoreNum: {
+    fontSize: 14,
+    fontWeight: "600",
+    minWidth: 28,
+    textAlign: "right",
+  },
   tipRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   tipDot: { width: 5, height: 5, borderRadius: 3 },
-  tipText: { fontSize: 12, color: "rgba(255,255,255,0.85)", flex: 1 },
+  tipText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.85)",
+    flex: 1,
+  },
 
-  bottom: { backgroundColor: "#111", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16 },
-  settingsToggle: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  bottom: {
+    backgroundColor: "#111",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  settingsToggle: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
   settingsToggleText: { fontSize: 11, color: "rgba(255,255,255,0.5)" },
-  settingsPanel: { backgroundColor: "#1a1a1a", borderRadius: 12, padding: 14, marginBottom: 12 },
+  settingsPanel: {
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
   settingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -561,7 +709,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   settingLabel: { fontSize: 12, color: "rgba(255,255,255,0.65)" },
-  toggle: { width: 36, height: 20, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.2)" },
+  toggle: {
+    width: 36,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
   toggleOn: { backgroundColor: "#FFD700" },
   threshBtns: { flexDirection: "row", alignItems: "center", gap: 10 },
   threshBtn: {
@@ -573,9 +726,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   threshBtnText: { color: "white", fontSize: 16 },
-  threshVal: { color: "#FFD700", fontSize: 13, fontWeight: "600", minWidth: 28, textAlign: "center" },
+  threshVal: {
+    color: "#FFD700",
+    fontSize: 13,
+    fontWeight: "600",
+    minWidth: 28,
+    textAlign: "center",
+  },
 
-  scriptsRow: { flexDirection: "row", gap: 8, marginBottom: 16, flexWrap: "wrap" },
+  scriptsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+    flexWrap: "wrap",
+  },
   scriptChip: {
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -587,7 +751,11 @@ const styles = StyleSheet.create({
   scriptText: { fontSize: 11, color: "rgba(255,255,255,0.6)" },
   scriptTextActive: { color: "#000", fontWeight: "600" },
 
-  controls: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  controls: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   galleryBtn: {
     width: 52,
     height: 52,
@@ -597,7 +765,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 0.5,
     borderColor: "rgba(255,255,255,0.15)",
+    overflow: "hidden",
   },
+  galleryThumb: { width: 52, height: 52, borderRadius: 10 },
   badge: {
     position: "absolute",
     top: -6,
@@ -620,8 +790,16 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "rgba(255,255,255,0.4)",
   },
-  shutterReady: { backgroundColor: "#4ADE80", borderColor: "rgba(74,222,128,0.4)" },
-  shutterInner: { width: 58, height: 58, borderRadius: 29, backgroundColor: "#fff" },
+  shutterReady: {
+    backgroundColor: "#4ADE80",
+    borderColor: "rgba(74,222,128,0.4)",
+  },
+  shutterInner: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "#fff",
+  },
   shutterInnerReady: { backgroundColor: "#4ADE80" },
   flipBtn: {
     width: 52,
@@ -631,4 +809,54 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+
+  // Gallery modal
+  galleryModal: { flex: 1, backgroundColor: "#0a0a0a" },
+  galleryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 52,
+    paddingBottom: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+  galleryTitle: { color: "white", fontSize: 16, fontWeight: "600" },
+  galleryClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  galleryCloseText: { color: "white", fontSize: 16 },
+  galleryGrid: { padding: 16 },
+  gridThumb: {
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: 6,
+    backgroundColor: "#222",
+  },
+
+  // Fullscreen preview
+  fullscreenOverlay: {
+    flex: 1,
+    backgroundColor: "#000",
+    justifyContent: "center",
+  },
+  fullscreenClose: {
+    position: "absolute",
+    top: 52,
+    right: 16,
+    zIndex: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullscreenImage: { width: "100%", height: "100%" },
 });

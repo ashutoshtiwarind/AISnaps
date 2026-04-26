@@ -29,6 +29,7 @@ export function useAICoach({ scriptIndex, autoEnabled, threshold }: Props): Retu
   const [autoFire, setAutoFire] = useState(false);
 
   const targetRef = useRef(68);
+  const scoreRef = useRef(68);
   const tipIdxRef = useRef(0);
   const autoFiredRef = useRef(false);
 
@@ -45,25 +46,25 @@ export function useAICoach({ scriptIndex, autoEnabled, threshold }: Props): Retu
     let animFrame: number;
 
     const tick = () => {
-      setScore((prev) => {
-        const diff = targetRef.current - prev;
-        const next = prev + diff * 0.04;
-        const rounded = Math.round(next * 10) / 10;
+      const diff = targetRef.current - scoreRef.current;
+      const rounded = Math.round((scoreRef.current + diff * 0.04) * 10) / 10;
+      scoreRef.current = rounded;
+      setScore(rounded);
 
-        // Trigger auto-fire once per peak
-        if (autoEnabled && rounded >= threshold && !autoFiredRef.current) {
-          autoFiredRef.current = true;
-          setAutoFire(true);
-          setTimeout(() => {
-            setAutoFire(false);
-            autoFiredRef.current = false;
-            // Drop score after auto-fire so it can build up again
-            targetRef.current = 50 + Math.floor(Math.random() * 25);
-          }, 3000);
-        }
+      // Reset guard only when score genuinely falls below threshold again,
+      // not on a timer — prevents re-firing while score is still high.
+      if (rounded < threshold) {
+        autoFiredRef.current = false;
+      }
 
-        return rounded;
-      });
+      if (autoEnabled && rounded >= threshold && !autoFiredRef.current) {
+        autoFiredRef.current = true;
+        setAutoFire(true);
+        // Drop target well below threshold so score must rebuild before next shot
+        targetRef.current = Math.max(30, threshold - 20 - Math.floor(Math.random() * 15));
+        setTimeout(() => setAutoFire(false), 2000);
+      }
+
       animFrame = requestAnimationFrame(tick);
     };
 
