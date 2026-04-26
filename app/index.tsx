@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Video, ResizeMode } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path, Line, Circle, Rect } from "react-native-svg";
 
@@ -249,6 +249,12 @@ const FLASH_CYCLE: Record<FlashMode, FlashMode> = { off: "auto", auto: "on", on:
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function pad(n: number) { return String(n).padStart(2, "0"); }
 function formatDuration(sec: number) { return `${pad(Math.floor(sec / 60))}:${pad(sec % 60)}`; }
+
+// Separate component so useVideoPlayer hook is called at component level, not inside renderItem
+function VideoItem({ uri, style }: { uri: string; style: object }) {
+  const player = useVideoPlayer(uri);
+  return <VideoView player={player} style={style} nativeControls contentFit="contain" />;
+}
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function HomeScreen() {
@@ -842,13 +848,7 @@ export default function HomeScreen() {
                       resizeMode="contain"
                     />
                   ) : (
-                    <Video
-                      source={{ uri: item.uri }}
-                      style={{ width, flex: 1 }}
-                      resizeMode={ResizeMode.CONTAIN}
-                      useNativeControls
-                      shouldPlay={false}
-                    />
+                    <VideoItem uri={item.uri} style={{ width, flex: 1 }} />
                   )
                 }
               />
