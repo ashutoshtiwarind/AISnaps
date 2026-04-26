@@ -1,12 +1,14 @@
 import { useIsFocused } from "@react-navigation/native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import {
   ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
   Image,
+  Linking,
   Modal,
   PanResponder,
   StatusBar,
@@ -250,6 +252,29 @@ const FLASH_CYCLE: Record<FlashMode, FlashMode> = { off: "auto", auto: "on", on:
 function pad(n: number) { return String(n).padStart(2, "0"); }
 function formatDuration(sec: number) { return `${pad(Math.floor(sec / 60))}:${pad(sec % 60)}`; }
 
+// Generates and shows a real video thumbnail in the grid
+function VideoThumbnailThumb({ uri, thumbStyle }: { uri: string; thumbStyle: object }) {
+  const [thumb, setThumb] = useState<string | null>(null);
+  useEffect(() => {
+    VideoThumbnails.getThumbnailAsync(uri, { time: 500 })
+      .then(({ uri: t }) => setThumb(t))
+      .catch(() => {});
+  }, [uri]);
+
+  return (
+    <View style={[thumbStyle, { overflow: "hidden" }]}>
+      {thumb ? (
+        <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, { justifyContent: "center", alignItems: "center", backgroundColor: "#1a1a1a" }]} />
+      )}
+      <View style={{ position: "absolute", bottom: 4, right: 6 }}>
+        <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.9)" }}>▶</Text>
+      </View>
+    </View>
+  );
+}
+
 // Separate component so useVideoPlayer hook is called at component level, not inside renderItem
 function VideoItem({ uri, style }: { uri: string; style: object }) {
   const player = useVideoPlayer(uri);
@@ -450,6 +475,16 @@ export default function HomeScreen() {
     setGalleryVisible(true);
     setGalleryLoading(true);
     try {
+      // Ensure permission is granted before querying
+      let perm = mediaLibraryPermission;
+      if (perm?.status !== "granted") {
+        perm = await requestMediaLibraryPermission();
+      }
+      if (perm?.status !== "granted") {
+        setGalleryData(capturedMedia);
+        setGalleryLoading(false);
+        return;
+      }
       const { assets } = await MediaLibrary.getAssetsAsync({
         sortBy: MediaLibrary.SortBy.creationTime,
         mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
@@ -465,7 +500,7 @@ export default function HomeScreen() {
       setGalleryData(capturedMedia);
     }
     setGalleryLoading(false);
-  }, [capturedMedia]);
+  }, [capturedMedia, mediaLibraryPermission, requestMediaLibraryPermission]);
 
   const handleTap = useCallback(async (e: any) => {
     const { locationX: x, locationY: y } = e.nativeEvent;
@@ -791,9 +826,17 @@ export default function HomeScreen() {
             <>
               <View style={s.galleryHeader}>
                 <Text style={s.galleryTitle}>Gallery ({galleryData.length})</Text>
-                <TouchableOpacity onPress={() => setGalleryVisible(false)} style={s.galleryClose}>
-                  <Text style={s.galleryCloseText}>✕</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL("content://media/external/images/media").catch(() => Linking.openURL("content://media/internal/images/media").catch(() => {}))}
+                    style={[s.galleryClose, { width: "auto", paddingHorizontal: 10 }]}
+                  >
+                    <Text style={{ color: "#FFD700", fontSize: 11, fontWeight: "700" }}>PHONE</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setGalleryVisible(false)} style={s.galleryClose}>
+                    <Text style={s.galleryCloseText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
               {galleryLoading ? (
                 <View style={s.galleryCenter}>
@@ -816,10 +859,7 @@ export default function HomeScreen() {
                       {item.type === "photo" ? (
                         <Image source={{ uri: item.uri }} style={s.gridThumb} />
                       ) : (
-                        <View style={[s.gridThumb, s.videoThumbBg]}>
-                          <Text style={s.videoPlayIcon}>▶</Text>
-                          <Text style={s.videoLabel}>VIDEO</Text>
-                        </View>
+                        <VideoThumbnailThumb uri={item.uri} thumbStyle={s.gridThumb} />
                       )}
                     </TouchableOpacity>
                   )}
