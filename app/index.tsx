@@ -1,11 +1,11 @@
 import { useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   FlatList,
   Image,
-  Linking,
   Modal,
   PanResponder,
   StatusBar,
@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Video, ResizeMode } from "expo-av";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path, Line, Circle, Rect } from "react-native-svg";
 
@@ -282,10 +283,10 @@ export default function HomeScreen() {
 
   // Gallery
   const [capturedMedia, setCapturedMedia] = useState<MediaItem[]>([]);
-  const [galleryItems, setGalleryItems] = useState<MediaItem[]>([]);
+  const [galleryData, setGalleryData] = useState<MediaItem[]>([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
   const [galleryVisible, setGalleryVisible] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
-  const [savedVideoUris, setSavedVideoUris] = useState<Set<string>>(new Set());
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   // Focus ring
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
@@ -335,18 +336,16 @@ export default function HomeScreen() {
 
   const cycleFlash = useCallback(() => setFlashMode((m) => FLASH_CYCLE[m]), []);
 
-  // Safe album save — creates album on first use, avoids the "album query null" crash
-  const saveToLibrary = useCallback(async (uri: string) => {
+  // Save to system gallery — createAssetAsync only (no addAssetsToAlbum, which triggers
+  // the Android 11+ "Allow modification?" system dialog on every call). Returns the
+  // persistent content:// URI so callers can store it instead of the temp file:// path.
+  const saveToLibrary = useCallback(async (fileUri: string): Promise<string> => {
     try {
-      const asset = await MediaLibrary.createAssetAsync(uri);
-      const album = await MediaLibrary.getAlbumAsync("SnapCoach");
-      if (album) {
-        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-      } else {
-        await MediaLibrary.createAlbumAsync("SnapCoach", asset, false);
-      }
+      const asset = await MediaLibrary.createAssetAsync(fileUri);
+      return asset.uri;
     } catch (e: any) {
-      console.log("Library save error (non-fatal):", e?.message);
+      console.log("Library save error:", e?.message);
+      return fileUri;
     }
   }, []);
 
@@ -364,15 +363,13 @@ export default function HomeScreen() {
       if (!cameraRef.current) { showToastMsg("Camera not ready"); return; }
       try {
         const photo = await cameraRef.current.takePhoto({ flash: flashMode });
-        const uri = "file://" + photo.path;
-        setCapturedMedia((p) => [{ uri, type: "photo" }, ...p]);
+        const fileUri = "file://" + photo.path;
+        const savedUri = mediaLibraryPermission?.status === "granted"
+          ? await saveToLibrary(fileUri)
+          : fileUri;
+        setCapturedMedia((p) => [{ uri: savedUri, type: "photo" }, ...p]);
         setCaptureCount((c) => c + 1);
-        showToastMsg(
-          isAuto ? `Auto shot! Score: ${Math.round(scoreRef.current)}` : "Photo saved ✓"
-        );
-        if (mediaLibraryPermission?.status === "granted") {
-          await saveToLibrary(uri);
-        }
+        showToastMsg(isAuto ? `Auto shot! Score: ${Math.round(scoreRef.current)}` : "Saved ✓");
       } catch (e: any) {
         showToastMsg("Capture failed");
         console.log("Capture error:", e?.message);
@@ -415,10 +412,12 @@ export default function HomeScreen() {
         clearInterval(recTimerRef.current!);
         setIsRecording(false);
         setRecSeconds(0);
-        const uri = "file://" + video.path;
-        setCapturedMedia((p) => [{ uri, type: "video" }, ...p]);
+        const fileUri = "file://" + video.path;
+        // Keep file:// for playback; save to library in background (no await = no dialog wait)
+        if (mediaLibraryPermission?.status === "granted") saveToLibrary(fileUri);
+        setCapturedMedia((p) => [{ uri: fileUri, type: "video" }, ...p]);
         setCaptureCount((c) => c + 1);
-        showToastMsg("Video recorded ✓");
+        showToastMsg("Saved ✓");
       },
       onRecordingError: (e) => {
         clearInterval(recTimerRef.current!);
@@ -442,34 +441,25 @@ export default function HomeScreen() {
   }, [cameraMode, isRecording, capture, startRecording, stopRecording]);
 
   const openGallery = useCallback(async () => {
-    try {
-      const album = await MediaLibrary.getAlbumAsync("SnapCoach");
-      const libraryItems: MediaItem[] = [];
-      if (album) {
-        const { assets } = await MediaLibrary.getAssetsAsync({
-          album,
-          sortBy: MediaLibrary.SortBy.creationTime,
-          mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
-          first: 200,
-        });
-        assets.forEach((a) =>
-          libraryItems.push({
-            uri: a.uri,
-            type: a.mediaType === "video" ? "video" : "photo",
-          })
-        );
-      }
-      // Prepend unsaved session videos (not in library yet)
-      const sessionVideos = capturedMedia.filter((m) => m.type === "video");
-      const merged = [...sessionVideos, ...libraryItems];
-      if (merged.length === 0) { showToastMsg("No media yet"); return; }
-      setGalleryItems(merged);
-    } catch {
-      if (capturedMedia.length === 0) { showToastMsg("No media yet"); return; }
-      setGalleryItems(capturedMedia);
-    }
     setGalleryVisible(true);
-  }, [capturedMedia, showToastMsg]);
+    setGalleryLoading(true);
+    try {
+      const { assets } = await MediaLibrary.getAssetsAsync({
+        sortBy: MediaLibrary.SortBy.creationTime,
+        mediaType: [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
+        first: 100,
+      });
+      setGalleryData(
+        assets.map((a) => ({
+          uri: a.uri,
+          type: (a.mediaType === "video" ? "video" : "photo") as "photo" | "video",
+        }))
+      );
+    } catch {
+      setGalleryData(capturedMedia);
+    }
+    setGalleryLoading(false);
+  }, [capturedMedia]);
 
   const handleTap = useCallback(async (e: any) => {
     const { locationX: x, locationY: y } = e.nativeEvent;
@@ -781,71 +771,90 @@ export default function HomeScreen() {
       </View>
 
       {/* ── GALLERY MODAL ──────────────────────────────────────────── */}
-      <Modal visible={galleryVisible} animationType="slide" onRequestClose={() => setGalleryVisible(false)}>
+      <Modal
+        visible={galleryVisible}
+        animationType="slide"
+        onRequestClose={() => {
+          if (selectedIndex !== null) { setSelectedIndex(null); }
+          else { setGalleryVisible(false); }
+        }}
+      >
         <View style={s.galleryModal}>
-          <View style={s.galleryHeader}>
-            <Text style={s.galleryTitle}>SnapCoach ({galleryItems.length})</Text>
-            <TouchableOpacity onPress={() => setGalleryVisible(false)} style={s.galleryClose}>
-              <Text style={s.galleryCloseText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={galleryItems}
-            numColumns={3}
-            keyExtractor={(item, i) => item.uri + i}
-            contentContainerStyle={s.galleryGrid}
-            columnWrapperStyle={{ gap: 4 }}
-            ItemSeparatorComponent={() => <View style={{ height: 4 }} />}
-            renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => setSelectedItem(item)}>
-                {item.type === "photo" ? (
-                  <Image source={{ uri: item.uri }} style={s.gridThumb} />
-                ) : (
-                  <View style={[s.gridThumb, s.videoThumbBg]}>
-                    <Text style={s.videoPlayIcon}>▶</Text>
-                    <Text style={s.videoLabel}>VIDEO</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-        {selectedItem && (
-          <Modal visible transparent animationType="fade" onRequestClose={() => setSelectedItem(null)}>
-            <View style={s.fullscreenOverlay}>
-              <TouchableOpacity style={s.fullscreenClose} onPress={() => setSelectedItem(null)}>
+          {selectedIndex === null ? (
+            /* ── Grid view ── */
+            <>
+              <View style={s.galleryHeader}>
+                <Text style={s.galleryTitle}>Gallery ({galleryData.length})</Text>
+                <TouchableOpacity onPress={() => setGalleryVisible(false)} style={s.galleryClose}>
+                  <Text style={s.galleryCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+              {galleryLoading ? (
+                <View style={s.galleryCenter}>
+                  <ActivityIndicator color="#FFD700" size="large" />
+                </View>
+              ) : galleryData.length === 0 ? (
+                <View style={s.galleryCenter}>
+                  <Text style={s.galleryEmpty}>No photos yet</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={galleryData}
+                  numColumns={3}
+                  keyExtractor={(item, i) => item.uri + i}
+                  contentContainerStyle={s.galleryGrid}
+                  columnWrapperStyle={{ gap: 4 }}
+                  ItemSeparatorComponent={() => <View style={{ height: 4 }} />}
+                  renderItem={({ item, index }) => (
+                    <TouchableOpacity onPress={() => setSelectedIndex(index)}>
+                      {item.type === "photo" ? (
+                        <Image source={{ uri: item.uri }} style={s.gridThumb} />
+                      ) : (
+                        <View style={[s.gridThumb, s.videoThumbBg]}>
+                          <Text style={s.videoPlayIcon}>▶</Text>
+                          <Text style={s.videoLabel}>VIDEO</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
+            </>
+          ) : (
+            /* ── Swipe pager ── */
+            <View style={{ flex: 1, backgroundColor: "#000" }}>
+              <TouchableOpacity style={s.fullscreenClose} onPress={() => setSelectedIndex(null)}>
                 <Text style={s.galleryCloseText}>✕</Text>
               </TouchableOpacity>
-              {selectedItem.type === "photo" ? (
-                <Image source={{ uri: selectedItem.uri }} style={s.fullscreenImage} resizeMode="contain" />
-              ) : (
-                <View style={s.videoPreviewBox}>
-                  <Text style={s.videoPlayIcon}>▶</Text>
-                  <Text style={s.videoPreviewLabel}>Tap to open in system player</Text>
-                  <TouchableOpacity
-                    style={s.openPlayerBtn}
-                    onPress={() => Linking.openURL(selectedItem.uri)}
-                  >
-                    <Text style={s.openPlayerTxt}>Open Video</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[s.openPlayerBtn, savedVideoUris.has(selectedItem.uri) && s.savedBtn]}
-                    onPress={async () => {
-                      if (savedVideoUris.has(selectedItem.uri)) return;
-                      await saveToLibrary(selectedItem.uri);
-                      setSavedVideoUris((prev) => new Set(prev).add(selectedItem.uri));
-                      showToastMsg("Saved to gallery ✓");
-                    }}
-                  >
-                    <Text style={s.openPlayerTxt}>
-                      {savedVideoUris.has(selectedItem.uri) ? "Saved ✓" : "Save to Gallery"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+              <FlatList
+                data={galleryData}
+                horizontal
+                pagingEnabled
+                initialScrollIndex={selectedIndex}
+                getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item, i) => item.uri + i}
+                renderItem={({ item }) =>
+                  item.type === "photo" ? (
+                    <Image
+                      source={{ uri: item.uri }}
+                      style={{ width, flex: 1 }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Video
+                      source={{ uri: item.uri }}
+                      style={{ width, flex: 1 }}
+                      resizeMode={ResizeMode.CONTAIN}
+                      useNativeControls
+                      shouldPlay={false}
+                    />
+                  )
+                }
+              />
             </View>
-          </Modal>
-        )}
+          )}
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -976,6 +985,8 @@ const s = StyleSheet.create({
   fullscreenOverlay: { flex: 1, backgroundColor: "#000", justifyContent: "center" },
   fullscreenClose: { position: "absolute", top: 52, right: 16, zIndex: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
   fullscreenImage: { width: "100%", height: "100%" },
+  galleryCenter:   { flex: 1, justifyContent: "center", alignItems: "center" },
+  galleryEmpty:    { color: "rgba(255,255,255,0.4)", fontSize: 16 },
 
   // Video gallery styles
   videoThumbBg:      { justifyContent: "center", alignItems: "center", backgroundColor: "#1a1a1a" },
@@ -984,6 +995,5 @@ const s = StyleSheet.create({
   videoPreviewBox:   { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
   videoPreviewLabel: { color: "rgba(255,255,255,0.6)", fontSize: 14 },
   openPlayerBtn:     { backgroundColor: "#FFD700", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24 },
-  savedBtn:          { backgroundColor: "#4ADE80" },
   openPlayerTxt:     { color: "#000", fontWeight: "700", fontSize: 14 },
 });
