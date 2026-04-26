@@ -8,6 +8,7 @@ interface Props {
   scriptIndex: number;
   autoEnabled: boolean;
   threshold: number;
+  enabled: boolean;
 }
 
 interface Return {
@@ -23,7 +24,7 @@ function getScoreColor(s: number): string {
   return "#F87171";              // red
 }
 
-export function useAICoach({ scriptIndex, autoEnabled, threshold }: Props): Return {
+export function useAICoach({ scriptIndex, autoEnabled, threshold, enabled }: Props): Return {
   const [score, setScore] = useState(68);
   const [tip, setTip] = useState(SCRIPTS[0].tips[0]);
   const [autoFire, setAutoFire] = useState(false);
@@ -33,16 +34,23 @@ export function useAICoach({ scriptIndex, autoEnabled, threshold }: Props): Retu
   const tipIdxRef = useRef(0);
   const autoFiredRef = useRef(false);
 
-  // Reset when script changes
+  // Reset when script changes or AI mode turns on
   useEffect(() => {
+    if (!enabled) return;
     tipIdxRef.current = 0;
     setTip(SCRIPTS[scriptIndex].tips[0]);
     targetRef.current = 55 + Math.floor(Math.random() * 35);
     autoFiredRef.current = false;
-  }, [scriptIndex]);
+  }, [enabled, scriptIndex]);
 
-  // Score animation loop — smooth drift toward target
+  // Score animation loop — only runs when AI mode is on
   useEffect(() => {
+    if (!enabled) {
+      setScore(0);
+      setAutoFire(false);
+      return;
+    }
+
     let animFrame: number;
 
     const tick = () => {
@@ -51,8 +59,6 @@ export function useAICoach({ scriptIndex, autoEnabled, threshold }: Props): Retu
       scoreRef.current = rounded;
       setScore(rounded);
 
-      // Reset guard only when score genuinely falls below threshold again,
-      // not on a timer — prevents re-firing while score is still high.
       if (rounded < threshold) {
         autoFiredRef.current = false;
       }
@@ -60,7 +66,6 @@ export function useAICoach({ scriptIndex, autoEnabled, threshold }: Props): Retu
       if (autoEnabled && rounded >= threshold && !autoFiredRef.current) {
         autoFiredRef.current = true;
         setAutoFire(true);
-        // Drop target well below threshold so score must rebuild before next shot
         targetRef.current = Math.max(30, threshold - 20 - Math.floor(Math.random() * 15));
         setTimeout(() => setAutoFire(false), 2000);
       }
@@ -70,10 +75,12 @@ export function useAICoach({ scriptIndex, autoEnabled, threshold }: Props): Retu
 
     animFrame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animFrame);
-  }, [autoEnabled, threshold]);
+  }, [enabled, autoEnabled, threshold]);
 
-  // Tip cycling — new tip every 4 seconds, new target score with each tip
+  // Tip cycling — only runs when AI mode is on
   useEffect(() => {
+    if (!enabled) return;
+
     const interval = setInterval(() => {
       const tips = SCRIPTS[scriptIndex].tips;
       tipIdxRef.current = (tipIdxRef.current + 1) % tips.length;
@@ -82,7 +89,7 @@ export function useAICoach({ scriptIndex, autoEnabled, threshold }: Props): Retu
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [scriptIndex]);
+  }, [enabled, scriptIndex]);
 
   return {
     score,

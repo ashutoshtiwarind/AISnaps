@@ -307,6 +307,7 @@ export default function HomeScreen() {
   const [captureCount, setCaptureCount] = useState(0);
   const [showToast, setShowToast] = useState(false);
   const [showAutoBadge, setShowAutoBadge] = useState(false);
+  const [aiMode, setAiMode] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [autoEnabled, setAutoEnabled] = useState(true);
   const [threshold, setThreshold] = useState(88);
@@ -335,8 +336,9 @@ export default function HomeScreen() {
   // AI Coach
   const { score, tip, scoreColor, autoFire } = useAICoach({
     scriptIndex: activeScript,
-    autoEnabled,
+    autoEnabled: autoEnabled && aiMode,
     threshold,
+    enabled: aiMode,
   });
 
   // Keep score in a ref so capture() doesn't need score as a dep (fixes auto-fire loop)
@@ -581,9 +583,15 @@ export default function HomeScreen() {
 
         {/* ── Top bar ── */}
         <View style={s.topBar}>
-          <View style={s.modePill}>
-            <Text style={s.modeText}>{SCRIPTS[activeScript].label.toUpperCase()}</Text>
-          </View>
+          {/* Script label — only when AI mode on */}
+          {aiMode ? (
+            <View style={s.modePill}>
+              <Text style={s.modeText}>{SCRIPTS[activeScript].label.toUpperCase()}</Text>
+            </View>
+          ) : (
+            <View />
+          )}
+
           <View style={{ flexDirection: "row", gap: 8 }}>
             {/* Flash — cycles Off → Auto → On (hidden in video mode) */}
             {cameraMode === "photo" && (
@@ -601,6 +609,16 @@ export default function HomeScreen() {
             >
               <Text style={[s.iconTxt, overlayMode !== "none" && { color: "#FFD700" }]}>
                 {OVERLAY_OPTIONS.find((o) => o.mode === overlayMode)?.icon ?? "▦"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* AI mode toggle */}
+            <TouchableOpacity
+              style={[s.iconBtn, aiMode && s.iconBtnActive]}
+              onPress={() => { setAiMode((m) => !m); if (settingsOpen) setSettingsOpen(false); }}
+            >
+              <Text style={[s.iconTxt, { color: aiMode ? "#FFD700" : "rgba(255,255,255,0.45)" }]}>
+                AI
               </Text>
             </TouchableOpacity>
           </View>
@@ -670,8 +688,8 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* AI Score overlay — hidden while recording */}
-        {!isRecording && (
+        {/* AI Score overlay — only in AI mode, hidden while recording */}
+        {aiMode && !isRecording && (
           <View style={s.aiOverlay}>
             <View style={s.scoreRow}>
               <Text style={s.scoreLabel}>AI Score</Text>
@@ -698,8 +716,8 @@ export default function HomeScreen() {
 
       {/* ── BOTTOM PANEL ─────────────────────────────────────────────── */}
       <View style={s.bottom}>
-        {/* Settings toggle — only in photo mode */}
-        {cameraMode === "photo" && (
+        {/* Settings toggle — only in AI mode + photo mode */}
+        {aiMode && cameraMode === "photo" && (
           <>
             <TouchableOpacity style={s.settingsToggle} onPress={() => setSettingsOpen((o) => !o)}>
               <Text style={s.settingsToggleText}>⚙  AI Settings</Text>
@@ -731,20 +749,22 @@ export default function HomeScreen() {
           </>
         )}
 
-        {/* Scripts */}
-        <View style={s.scriptsRow}>
-          {SCRIPTS.map((sc, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[s.scriptChip, i === activeScript && s.scriptChipActive]}
-              onPress={() => setActiveScript(i)}
-            >
-              <Text style={[s.scriptText, i === activeScript && s.scriptTextActive]}>
-                {sc.icon} {sc.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Scripts — only in AI mode */}
+        {aiMode && (
+          <View style={s.scriptsRow}>
+            {SCRIPTS.map((sc, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[s.scriptChip, i === activeScript && s.scriptChipActive]}
+                onPress={() => setActiveScript(i)}
+              >
+                <Text style={[s.scriptText, i === activeScript && s.scriptTextActive]}>
+                  {sc.icon} {sc.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Controls row */}
         <View style={s.controls}>
