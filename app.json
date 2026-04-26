@@ -8,25 +8,21 @@
     "scheme": "snapcoach",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": {
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SnapCoach to access your camera"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow SnapCoach to save photos to your photo library",
+          "savePhotosPermission": "Allow SnapCoach to save photos to your photo library"
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -40,6 +36,25 @@
         }
       ]
     ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.SnapCoach"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.SnapCoach"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
