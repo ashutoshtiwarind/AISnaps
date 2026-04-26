@@ -1,4 +1,5 @@
 import { useIsFocused } from "@react-navigation/native";
+import { VideoView, useVideoPlayer } from "expo-video";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,9 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { VideoView, useVideoPlayer } from "expo-video";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Svg, { Path, Line, Circle, Rect } from "react-native-svg";
+import Svg, { Circle, Line, Path, Rect } from "react-native-svg";
 
 import * as MediaLibrary from "expo-media-library";
 import {
@@ -527,8 +527,8 @@ export default function HomeScreen() {
           style={StyleSheet.absoluteFill}
           device={device}
           isActive={isFocused && !galleryVisible}
-          photo={cameraMode === "photo"}
-          video={cameraMode === "video"}
+          photo={true}
+          video={true}
           audio={cameraMode === "video"}
           exposure={exposure}
         />
