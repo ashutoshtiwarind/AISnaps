@@ -4,10 +4,13 @@ This document centralizes project status, role responsibilities, decisions, and 
 
 ## Overview
 
-AISnaps is a mobile-first Expo app with a web demo mode. The key goals are:
-- Validate native camera capture and recording on device.
-- Keep the web demo separate from native camera logic.
-- Improve AI coaching, onboarding, and gallery UX.
+AISnaps is a mobile-first Expo app, repositioning to **"Your AI photographer"** — coach the user live to take a great real photo, then give a shareable photo score. Strategy detail in [STRATEGY.md](STRATEGY.md); work items in [BACKLOG.md](BACKLOG.md).
+
+Core goals:
+
+- **Native app:** Live pose/framing coaching → auto-capture → photo score → before/after. Validate real device camera and permission flows.
+- **Web demo:** Preserve a safe demo mode with mock camera preview. Web logic stays separated from native camera logic.
+- **Product focus:** Score the photo (improvable), not the face. Shareable glow-up artifact drives virality.
 
 ## Current status
 
@@ -46,7 +49,9 @@ AISnaps is a mobile-first Expo app with a web demo mode. The key goals are:
 
 ## Next steps
 
-1. Review native camera capture and permission flow.
-2. Improve web demo messaging and mock interactions.
-3. Add gallery mock data for web and native preview.
-4. Document any technical or design blockers in this file.
+1. Cross-functional sign-off on the pivot (coaching → AI photographer + photo score) — see [BACKLOG.md](BACKLOG.md) V-3.
+2. Phase 0 validation: cut glow-up loop mockups, measure hook retention before building.
+3. ML: validate NIMA on selfies/portraits; confirm on-device pose loop latency.
+4. TL: confirm on-device vs cloud per-frame split; `react-native-vision-camera` frame processors.
+5. Designer: before/after score card (the viral artifact).
+6. Document technical or design blockers in this file.

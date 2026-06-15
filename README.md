@@ -1,21 +1,28 @@
 # AISnaps
 
-AISnaps is a mobile-first Expo camera app built to teach better photography through live composition overlays, AI coaching, and capture guidance.
+**Your AI photographer.** AISnaps coaches you live to take a great *real* photo of yourself — directing pose, angle, and framing in the moment — then gives you a shareable photo score with a before/after glow-up. Built mobile-first on Expo for Android and iOS.
+
+Not AI-generated photos. Real ones, coached live. See [STRATEGY.md](STRATEGY.md) for positioning and [BACKLOG.md](BACKLOG.md) for planned work.
+
+A web demo mode runs with a mock camera preview so the concept can be demonstrated without native hardware. Web logic stays strictly separate from native camera logic.
 
 ## Current status
 
-- **Mobile focus:** The app is built for Android/iOS with Expo and `react-native-vision-camera`.
-- **Web demo:** The browser version runs as a demo mode with a mock camera preview and UI controls.
-- **Main screen:** `app/index.tsx` contains the core experience including overlays, AI coaching, and gallery.
+- **Repositioning:** Pivoting from generic photography coaching to "AI photographer + photo score" (see [STRATEGY.md](STRATEGY.md)).
+- **Mobile focus:** Built for Android/iOS with Expo and `react-native-vision-camera`.
+- **Web demo:** Browser version runs as a functional demo with mock camera preview and UI controls.
+- **Main screen:** `app/index.tsx` contains the core experience — overlays, AI coaching, capture, and gallery.
 
 ## Priority roadmap
 
-1. Validate mobile camera capture and recording on device.
-2. Separate web/demo mode cleanly from native camera logic.
-3. Align Expo dependency versions to expected compatibility.
-4. Polish the web demo experience and messaging.
-5. Add permission and runtime error handling.
-6. Improve onboarding, AI guidance, and gallery UX.
+Tracked in phases — full detail in [BACKLOG.md](BACKLOG.md).
+
+1. **Phase 0 — Validate:** prove the glow-up loop as shareable content before building.
+2. **Phase 1 — Core loop:** live pose/framing direction → auto-capture → photo score → before/after card.
+3. **Phase 2 — Shareable artifact:** branded score card + TikTok/IG export.
+4. **Phase 3 — Retention:** streaks, "beat your best score," angle library.
+5. **Phase 4 — Monetize:** Superwall paywall.
+6. **Platform:** keep web demo separated from native, align Expo deps, permission + error handling.
 
 ## Run locally
 
