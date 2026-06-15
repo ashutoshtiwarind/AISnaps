@@ -16,10 +16,12 @@
 
 | ID | Item | Owner | Status | Notes |
 |----|------|-------|--------|-------|
-| SP-1 | MediaPipe Tasks as vision-camera frame-processor plugin in Expo dev build | TL | todo | Community vs custom native plugin; measure hot-loop latency on mid Android |
-| SP-2 | NIMA-vs-heuristic blend on ~50 real selfies | ML | todo | Gates score credibility; does blend track human "good photo" judgment? |
-| SP-2a | Wire NIMA loader (TF + AVA weights) into `spikes/sp2_score_credibility.py` | ML | todo | Unblocks end-to-end SP-2 once selfies + labels land |
-| SP-3 | Claude narration round-trip latency + cost per session at throttle | ML + TL | in-progress | Harness in `spikes/sp3_narration_cost.py`; needs API key + real frame to run live |
+> Status: all three spikes are **code-ready on main**; remaining work is execution with real devices / data / keys. Picking back up later.
+
+| SP-1 | MediaPipe Tasks as vision-camera frame-processor plugin in Expo dev build | TL | todo | vision-camera plugin scaffolded (T-6). Run on physical mid Android to measure hot-loop latency; decide community vs custom native plugin |
+| SP-2 | NIMA-vs-heuristic blend on ~50 real selfies | ML | todo | Script + NIMA loader ready (`spikes/sp2_score_credibility.py`). Needs ~50 selfies + `labels.csv` to run; gates score credibility |
+| SP-2a | Wire NIMA loader (TF + AVA weights) into `spikes/sp2_score_credibility.py` | ML | done | NIMA loader wired (graceful NaN fallback); enable with downloaded weights |
+| SP-3 | Claude narration round-trip latency + cost per session at throttle | ML + TL | todo | Harness ready (`spikes/sp3_narration_cost.py`). Needs `ANTHROPIC_API_KEY` + real frame to run live; DRY-RUN works now |
 
 ## Phase 1 — Core loop MVP
 

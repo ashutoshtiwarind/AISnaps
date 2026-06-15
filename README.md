@@ -9,7 +9,8 @@ A web demo mode runs with a mock camera preview so the concept can be demonstrat
 ## Current status
 
 - **Repositioning:** Pivoting from generic photography coaching to "AI photographer + photo score" (see [STRATEGY.md](STRATEGY.md)).
-- **Mobile focus:** Built for Android/iOS with Expo and `react-native-vision-camera`.
+- **Spikes code-ready:** SP-1 (frame-processor latency), SP-2 (score credibility), SP-3 (narration cost) are scaffolded in [spikes/](spikes/); execution with real devices / data / keys is pending. See [BACKLOG.md](BACKLOG.md).
+- **Mobile focus:** Built for Android/iOS with Expo and `react-native-vision-camera` (config plugin added; frame processors enabled).
 - **Web demo:** Browser version runs as a functional demo with mock camera preview and UI controls.
 - **Main screen:** `app/index.tsx` contains the core experience — overlays, AI coaching, capture, and gallery.
 
