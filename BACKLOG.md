@@ -61,5 +61,7 @@
 |----|------|-------|--------|-------|
 | T-1 | Keep web demo separate from native camera logic | TL | in-progress | Web stays mock-camera demo |
 | T-2 | Align Expo dependency versions | TL | todo | |
-| T-3 | Permission + runtime error handling | TL | todo | Camera + mic |
+| T-3 | Permission + runtime error handling | TL | todo | Camera; mic deferred (photo-first) |
 | T-4 | Confirm on-device vs cloud per-frame split | ML + TL | todo | Hybrid; see STRATEGY §4 |
+| T-5 | Migrate capture path expo-camera → vision-camera | TL | todo | Hot loop (C-1) needs frame processors; expo-camera can't. Gated by SP-1 |
+| T-6 | vision-camera config plugin in app.json | TL | done | Camera permission + frame processors; mic disabled for Phase 1 |

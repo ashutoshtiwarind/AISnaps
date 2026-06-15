@@ -1,0 +1,4 @@
+# SP-2 inputs/outputs — never commit (PII: real selfies)
+data/
+.venv/
+__pycache__/

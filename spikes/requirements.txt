@@ -1,0 +1,12 @@
+# SP-2 — score credibility spike
+numpy
+pandas
+scipy
+opencv-python
+mediapipe
+pillow
+# NIMA: TODO pick one path during the spike —
+#   (a) tensorflow + pretrained NIMA weights (MobileNet/Inception on AVA), or
+#   (b) a torch port (e.g. pretrained NIMA checkpoint).
+# Leave commented until the path is chosen so the heuristics run standalone first.
+# tensorflow
