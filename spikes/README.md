@@ -53,4 +53,22 @@ Output: per-image score table + Spearman correlation (NIMA-alone vs blend) vs hu
 
 Success: blend Spearman rho >= 0.6. If it fails, escalate to earlier NIMA fine-tune.
 
+## SP-3 — Claude narration cost/latency (ML + TL)
+
+```bash
+cd spikes
+pip install -r requirements.txt
+export ANTHROPIC_API_KEY=...        # Windows: $env:ANTHROPIC_API_KEY="..."
+python sp3_narration_cost.py --frame data/sample_frame.jpg --n 10
+```
+
+Measures the narration loop (downscaled frame + metrics -> one short cue):
+round-trip latency + per-call/per-session/projected cost on `claude-sonnet-4-6`.
+Fast reflex cue config: thinking disabled, effort low, max_tokens 256, system
+prompt cached. Without `ANTHROPIC_API_KEY` it runs DRY-RUN (cost projection from
+estimated tokens, no latency).
+
+Tune `CALLS_PER_SESSION` / `SESSIONS_PER_DAU` / `DAU` at the top of the script
+to your throttle + scale assumptions. Throttle is the cost lever (D-5).
+
 > `data/` is gitignored — do not commit selfies (PII).

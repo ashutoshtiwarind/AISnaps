@@ -19,7 +19,7 @@
 | SP-1 | MediaPipe Tasks as vision-camera frame-processor plugin in Expo dev build | TL | todo | Community vs custom native plugin; measure hot-loop latency on mid Android |
 | SP-2 | NIMA-vs-heuristic blend on ~50 real selfies | ML | todo | Gates score credibility; does blend track human "good photo" judgment? |
 | SP-2a | Wire NIMA loader (TF + AVA weights) into `spikes/sp2_score_credibility.py` | ML | todo | Unblocks end-to-end SP-2 once selfies + labels land |
-| SP-3 | Claude narration round-trip latency + cost per session at throttle | ML + TL | todo | Throttle is the cost lever |
+| SP-3 | Claude narration round-trip latency + cost per session at throttle | ML + TL | in-progress | Harness in `spikes/sp3_narration_cost.py`; needs API key + real frame to run live |
 
 ## Phase 1 — Core loop MVP
 

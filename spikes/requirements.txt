@@ -8,3 +8,6 @@ pillow
 # NIMA (SP-2a): TF/Keras MobileNet, AVA-trained (idealo weights).
 # Heuristics run without it; install to enable the NIMA term in the blend.
 tensorflow
+
+# SP-3 — Claude narration cost/latency harness.
+anthropic
