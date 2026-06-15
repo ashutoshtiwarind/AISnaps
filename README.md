@@ -1,22 +1,89 @@
-# Welcome to your Expo app 👋
+# AISnaps
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Your AI photographer.** AISnaps coaches you live to take a great *real* photo of yourself — directing pose, angle, and framing in the moment — then gives you a shareable photo score with a before/after glow-up. Built mobile-first on Expo for Android and iOS.
 
-## Get started
+Not AI-generated photos. Real ones, coached live. See [STRATEGY.md](STRATEGY.md) for positioning and [BACKLOG.md](BACKLOG.md) for planned work.
 
-1. Install dependencies
+A web demo mode runs with a mock camera preview so the concept can be demonstrated without native hardware. Web logic stays strictly separate from native camera logic.
 
-   ```bash
-   npm install
-   ```
+## Current status
 
-2. Start the app
+- **Repositioning:** Pivoting from generic photography coaching to "AI photographer + photo score" (see [STRATEGY.md](STRATEGY.md)).
+- **Mobile focus:** Built for Android/iOS with Expo and `react-native-vision-camera`.
+- **Web demo:** Browser version runs as a functional demo with mock camera preview and UI controls.
+- **Main screen:** `app/index.tsx` contains the core experience — overlays, AI coaching, capture, and gallery.
 
-   ```bash
-   npx expo start
-   ```
+## Priority roadmap
 
-In the output, you'll find options to open the app in a
+Tracked in phases — full detail in [BACKLOG.md](BACKLOG.md).
+
+1. **Phase 0 — Validate:** prove the glow-up loop as shareable content before building.
+2. **Phase 1 — Core loop:** live pose/framing direction → auto-capture → photo score → before/after card.
+3. **Phase 2 — Shareable artifact:** branded score card + TikTok/IG export.
+4. **Phase 3 — Retention:** streaks, "beat your best score," angle library.
+5. **Phase 4 — Monetize:** Superwall paywall.
+6. **Platform:** keep web demo separated from native, align Expo deps, permission + error handling.
+
+## Run locally
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the app:
+
+```bash
+npm start
+```
+
+Run the web demo:
+
+```bash
+npm run web
+```
+
+Then open `http://localhost:8081` in Chrome.
+
+## What works today
+
+- Main camera screen UI and layout
+- Composition overlay rendering
+- AI coach interface and mode toggle
+- Web demo mode with mock camera preview
+- Basic gallery modal and thumbnail support
+
+## What is still pending
+
+- Real camera capture on Android/iOS
+- Video recording flow on device
+- Microphone permission handling
+- Web gallery mock data and interactions
+- Expo dependency updates
+- Clear web messaging for unsupported camera features
+
+## Project structure
+
+- `app/` — main app screen and logic
+- `components/` — reusable UI components
+- `constants/` — shared config values
+- `hooks/` — custom hooks and feature logic
+- `assets/` — static media
+- `package.json` — dependencies and scripts
+
+## Notes for contributors
+
+- Keep web and native logic separated.
+- Avoid loading native camera modules on web.
+- Maintain overlay rendering as platform-agnostic.
+- Track current implementation context in `PROJECT_TRACKING.md`.
+- Update this README when the workflow changes.
+- Use role-specific skill files as guidance:
+  - `SKILL-spm.md` for product and roadmap planning.
+  - `SKILL-designer.md` for UI/UX and design decisions.
+  - `SKILL-tl.md` for technical leadership and implementation strategy.
+  - `SKILL-qa.md` for quality assurance and validation.
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)

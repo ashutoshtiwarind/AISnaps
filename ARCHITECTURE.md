@@ -1,33 +1,70 @@
-# SnapCoach Architecture Guide
+# AISnaps Architecture Guide
 
-## 🏗️ New Project Structure
+## Current Project Structure
 
 ```
-SnapCoach/
-│
-├── src/
-│   ├── app/
-│   │   └── index.tsx                 # Main camera screen (650 lines, clean & focused)
-│   │
-│   ├── components/                   # Reusable UI Components
-│   │   ├── overlays/
-│   │   │   └── GridOverlay.tsx       # 9 composition guide overlay modes
-│   │   ├── gallery/
-│   │   │   ├── VideoThumbnailThumb.tsx  # Video thumbnail generation
-│   │   │   └── VideoItem.tsx            # Video playback component
-│   │   └── index.ts                  # Centralized exports
-│   │
-│   ├── hooks/                        # Custom React Hooks
-│   │   ├── useAICoach.ts            # AI scoring and composition tips (existing)
-│   │   ├── useMediaLibrary.ts       # Media library permission management
-│   │   └── index.ts                 # Centralized exports
-│   │
-│   ├── services/                     # Business Logic & External APIs
-│   │   ├── mediaLibrary.ts          # All media library operations
-│   │   ├── overlayCalculations.ts   # Pure geometry calculation functions
-│   │   └── index.ts                 # Centralized exports
-│   │
-│   ├── constants/                    # Static Configuration
+AISnaps/
+├── app/
+│   └── index.tsx               # Main camera screen and primary app flow
+├── components/                 # Reusable UI components
+├── constants/                  # Shared static configuration
+├── hooks/                      # Custom hooks and state logic
+├── assets/                     # Static media and assets
+├── package.json                # Dependencies and scripts
+├── README.md                   # Project overview and run instructions
+├── ARCHITECTURE.md             # Architecture summary and current state
+├── CODE_QUALITY_CHECKLIST.md   # Coding and review checklist
+└── ...
+```
+
+## What exists today
+
+- **Single-entry app screen:** `app/index.tsx` hosts the main experience, including camera flow, overlay controls, AI coach, and gallery modal.
+- **Reusable modules:** `components/`, `constants/`, and `hooks/` provide supporting pieces.
+- **Web demo mode:** The web build renders a mock camera preview and maintains UI controls without native camera access.
+- **Native camera integration:** `react-native-vision-camera` is used for Android/iOS, while web uses fallback behavior.
+
+## Key architectural patterns
+
+### Screen-first UI
+- The app is centered on one main screen rather than multi-screen navigation.
+- This supports fast iteration on the core camera experience.
+
+### Shared state, platform-specific rendering
+- Core UI state is initialized once, then platform path decides whether to render native camera or web fallback.
+- This keeps overlay and control behavior consistent across platforms.
+
+### Overlay rendering as reusable logic
+- Composition guides are rendered using SVG and can be reused on both mobile and web.
+- This is the most platform-agnostic part of the codebase.
+
+## Current architecture concerns
+
+### 1. Main screen size
+- `app/index.tsx` is still large and mixes UI, camera hooks, gallery, and state.
+- Priority: split the screen into smaller components and hooks.
+
+### 2. Web/native separation
+- Web demo mode currently lives inside the same file as native camera logic.
+- Priority: move web fallback into a cleaner platform-specific path or dedicated component.
+
+### 3. Dependency mismatch
+- Package warnings indicate Expo dependencies should be aligned to expected versions.
+- Priority: upgrade and validate package compatibility.
+
+### 4. Mobile feature validation
+- Real mobile capture, recording, and permission flow are not fully verified.
+- Priority: test actual devices and fix native camera issues.
+
+## Recommended next steps
+
+1. **Refactor `app/index.tsx`** into reusable components.
+2. **Separate web/demo mode** from native camera logic.
+3. **Validate mobile capture** on device/emulator.
+4. **Upgrade Expo dependencies** to expected versions.
+5. **Add error states** for camera, mic, and media library permissions.
+6. **Document current architecture** and update run instructions.
+
 │   │   └── index.ts                 # Overlay options, colors, math constants
 │   │
 │   ├── types/                        # TypeScript Definitions
@@ -194,6 +231,11 @@ Is it a utility? → src/lib/
 Is it state/hooks? → src/hooks/
 Is it a screen? → src/app/
 ```
+
+## Current project tracking
+
+- Use `memory.md` to capture implementation status, ongoing decisions, and pending tasks.
+- Keep web/native constraints documented to avoid importing native-only modules on web.
 
 ## ✅ Quality Improvements
 

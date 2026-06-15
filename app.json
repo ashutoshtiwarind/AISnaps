@@ -17,6 +17,14 @@
         }
       ],
       [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Allow SnapCoach to access your camera for live photo coaching",
+          "enableMicrophonePermission": false,
+          "enableFrameProcessors": true
+        }
+      ],
+      [
         "expo-media-library",
         {
           "photosPermission": "Allow SnapCoach to save photos to your photo library",

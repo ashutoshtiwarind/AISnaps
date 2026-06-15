@@ -50,7 +50,10 @@ Use this checklist when adding new code to ensure it follows the refactored arch
 - [ ] **Exported from index.ts** - Available via `src/components`
 - [ ] **Reusable** - Not tied to specific screen logic
 - [ ] **Styled properly** - Uses styles from `src/styles`
-
+### Platform-specific behavior
+- [ ] **Keep web fallback separate** - Avoid native-only code in web render paths
+- [ ] **Guard native module imports** - Use `Platform.OS === 'web'` or platform files
+- [ ] **Document unsupported web features** - Clearly note limitations
 ### Utilities
 - [ ] **In `src/lib/helpers.ts`** - General utilities here
 - [ ] **Pure functions** - No side effects
