@@ -47,9 +47,47 @@ AVA aesthetics ≠ good selfie/dating photo. NIMA rates landscapes/art; may not 
 
 ## Spikes (gate Phase 1 estimates)
 
-- **SP-1 (TL):** MediaPipe Tasks as vision-camera frame-processor plugin in Expo dev build — community plugin or custom native plugin? Measure hot-loop latency on mid Android.
-- **SP-2 (ML):** NIMA-vs-heuristic blend on ~50 real selfies — does blended score track human "good photo" judgment? Gates score credibility.
-- **SP-3 (ML+TL):** Claude narration round-trip latency + cost per session at throttle.
+SP-1 and SP-2 run in parallel (different owners, no dependency). Both gate Phase 1 estimates. SP-3 runs after, since narration is not the hot path.
+
+### SP-1 — Frame-processor plugin viability (TL, timebox 3d)
+
+Question: can MediaPipe Pose + Face Landmarker run as a vision-camera frame processor in an Expo dev build at usable latency on mid Android?
+
+Steps:
+1. `expo prebuild` → dev build (vision-camera already needs this).
+2. Community plugin first: vision-camera v4 + `react-native-worklets-core` + a MediaPipe frame-processor plugin. Fall back to custom native plugin if none works on v4.
+3. Enable Face Landmarker **blendshapes** (eyes-open/smile/yaw for D-4).
+4. Log per-frame inference time on mid Android (Pixel 6a / mid Samsung) + iPhone.
+
+Success criteria:
+- Pose + Face landmarks ≥15fps, hot-loop budget <100ms/frame.
+- Blendshapes available in the frame processor.
+- Decision recorded: community vs custom native plugin (+ effort estimate).
+
+Deliverable: throwaway branch + latency numbers + go/no-go note here.
+
+### SP-2 — Score credibility (ML, timebox 4d)
+
+Question: does NIMA blended with heuristics track human "good photo" judgment on real selfies?
+
+Steps:
+1. Gather ~50 real selfies spanning good/bad (lighting, angle, blur, clutter, eye contact).
+2. Human-label 1–10 (2–3 raters, average).
+3. Run baseline NIMA (AVA) score.
+4. Compute heuristics: face sharpness, face-region lighting evenness, eye contact, rule-of-thirds on face, background clutter.
+5. Fit simple blend (weighted sum / small linear model) → score.
+6. Correlate NIMA-alone vs blend against human labels (Spearman).
+
+Success criteria:
+- Blend Spearman ρ ≥ 0.6 vs human (NIMA-alone expected lower — the point).
+- Clear weight recommendation for Phase 1.
+- If blend fails → escalate: fine-tune NIMA on portrait data earlier than Phase 3.
+
+Deliverable: notebook + correlation table + recommended blend weights here.
+
+### SP-3 — Claude narration cost/latency (ML+TL, after SP-1/SP-2)
+
+Claude narration round-trip latency + cost per session at throttle. Throttle is the cost lever; may drop to on-state-change only.
 
 ## Open risks
 
