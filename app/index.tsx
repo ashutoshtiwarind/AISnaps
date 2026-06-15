@@ -1,7 +1,7 @@
 import { useIsFocused } from "@react-navigation/native";
 import { VideoView, useVideoPlayer } from "expo-video";
-import React, { useCallback, useEffect, useRef, useState } from "react";
 import * as VideoThumbnails from "expo-video-thumbnails";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -11,6 +11,7 @@ import {
   Linking,
   Modal,
   PanResponder,
+  Platform,
   StatusBar,
   StyleSheet,
   Text,
@@ -21,12 +22,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Line, Path, Rect } from "react-native-svg";
 
 import * as MediaLibrary from "expo-media-library";
-import {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-  useMicrophonePermission,
-} from "react-native-vision-camera";
+
+// Conditionally import VisionCamera (not available on web)
+const isWeb = Platform.OS === "web";
+
+// Mock implementations for web
+const mockCamera = {
+  Camera: null,
+  useCameraDevice: () => null,
+  useCameraPermission: () => ({ hasPermission: false, requestPermission: async () => {} }),
+  useMicrophonePermission: () => ({ requestPermission: async () => {} }),
+};
+
 import { useAICoach } from "../hooks/useAICoach";
 import { SCRIPTS } from "../scripts/scripts";
 
@@ -283,17 +290,7 @@ function VideoItem({ uri, style }: { uri: string; style: object }) {
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function HomeScreen() {
-  const cameraRef = useRef<Camera>(null);
-  const [facing, setFacing] = useState<"back" | "front">("back");
-  const device = useCameraDevice(facing);
-  const { hasPermission, requestPermission } = useCameraPermission();
-  const { requestPermission: requestMicPerm } = useMicrophonePermission();
-  const [mediaLibraryPermission, requestMediaLibraryPermission] =
-    MediaLibrary.usePermissions();
-
-  const isFocused = useIsFocused();
-
-  // Mode
+  // Initialize state for both web and native
   const [cameraMode, setCameraMode] = useState<CameraMode>("photo");
   const [isRecording, setIsRecording] = useState(false);
   const [recSeconds, setRecSeconds] = useState(0);
@@ -316,22 +313,255 @@ export default function HomeScreen() {
   // Gallery
   const [capturedMedia, setCapturedMedia] = useState<MediaItem[]>([]);
   const [galleryData, setGalleryData] = useState<MediaItem[]>([]);
-  const [galleryLoading, setGalleryLoading] = useState(false);
   const [galleryVisible, setGalleryVisible] = useState(false);
+  const [galleryLoading, setGalleryLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  // Focus ring
+  // Camera state (shared with web mock)
+  const [viewSize, setViewSize] = useState({ w: 0, h: 0 });
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
   const focusAnim = useRef(new Animated.Value(1)).current;
-
-  // Exposure slider + lock
   const [exposure, setExposure] = useState(0);
-  const [expLocked, setExpLocked] = useState(false);
+  const [facing, setFacing] = useState<"back" | "front">("back");
   const expLockedRef = useRef(false);
   const expStartY = useRef(0);
+  const [expLocked, setExpLocked] = useState(false);
 
-  // Viewfinder size for dynamic overlays
-  const [viewSize, setViewSize] = useState({ w: width, h: width * 1.3 });
+  // Web demo mode
+  if (isWeb) {
+    const isFocused = useIsFocused();
+    const showToastMsg = (msg: string) => {
+      setToastMsg(msg);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 2000);
+    };
+
+    const cycleFlash = () => setFlashMode(FLASH_CYCLE[flashMode]);
+    const toggleExpLock = () => { expLockedRef.current = !expLockedRef.current; setExpLocked(!expLocked); };
+
+    const expPan = useRef(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onPanResponderGrant: (e) => { expStartY.current = e.nativeEvent.pageY; },
+        onPanResponderMove: (e) => {
+          if (expLockedRef.current) return;
+          const delta = expStartY.current - e.nativeEvent.pageY;
+          setExposure(Math.max(-1, Math.min(1, delta / 60)));
+        },
+      })
+    ).current;
+
+    const handleTap = useCallback(() => {
+      // Demo: show focus ring animation
+      setFocusPoint({ x: viewSize.w / 2, y: viewSize.h / 2 });
+      focusAnim.setValue(1.4);
+      Animated.timing(focusAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+      setTimeout(() => setFocusPoint(null), 1200);
+    }, [viewSize.w, viewSize.h]);
+
+    const showToastMsg_Demo = (msg: string) => showToastMsg(msg);
+
+    return (
+      <SafeAreaView style={s.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#000" />
+
+        {/* ── MOCK VIEWFINDER ─────────────────────────────────────────── */}
+        <View
+          style={s.viewfinder}
+          onTouchEnd={handleTap}
+          onLayout={(e) =>
+            setViewSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })
+          }
+        >
+          {/* Mock camera background */}
+          <View
+            style={{
+              ...StyleSheet.absoluteFill,
+              backgroundColor: "#1a1a1a",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ color: "rgba(255,255,255,0.3)", fontSize: 14 }}>Mock Camera Preview</Text>
+          </View>
+
+          {/* Frame overlay - REAL RENDERING */}
+          <GridOverlay mode={overlayMode} viewW={viewSize.w} viewH={viewSize.h} />
+
+          {/* Focus ring */}
+          {focusPoint && (
+            <Animated.View
+              pointerEvents="none"
+              style={[s.focusRing, { left: focusPoint.x - 30, top: focusPoint.y - 30, transform: [{ scale: focusAnim }] }]}
+            />
+          )}
+
+          {/* ── Top bar ── */}
+          <View style={s.topBar}>
+            {aiMode ? (
+              <View style={s.modePill}>
+                <Text style={s.modeText}>{SCRIPTS[activeScript].label.toUpperCase()}</Text>
+              </View>
+            ) : (
+              <View />
+            )}
+
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {cameraMode === "photo" && (
+                <TouchableOpacity style={s.iconBtn} onPress={cycleFlash}>
+                  <Text style={[s.iconTxt, { color: FLASH_COLORS[flashMode] }]}>
+                    {FLASH_ICONS[flashMode]}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[s.iconBtn, overlayPickerOpen && s.iconBtnActive]}
+                onPress={() => setOverlayPickerOpen((o) => !o)}
+              >
+                <Text style={[s.iconTxt, overlayMode !== "none" && { color: "#FFD700" }]}>
+                  {OVERLAY_OPTIONS.find((o) => o.mode === overlayMode)?.icon ?? "▦"}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[s.iconBtn, aiMode && s.iconBtnActive]}
+                onPress={() => {
+                  setAiMode((m) => !m);
+                  if (settingsOpen) setSettingsOpen(false);
+                }}
+              >
+                <Text style={[s.iconTxt, { color: aiMode ? "#FFD700" : "rgba(255,255,255,0.45)" }]}>
+                  AI
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ── Overlay picker popup ── */}
+          {overlayPickerOpen && (
+            <View style={s.overlayPicker}>
+              <Text style={s.overlayPickerTitle}>FRAME GUIDE</Text>
+              <View style={s.overlayGrid}>
+                {OVERLAY_OPTIONS.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.mode}
+                    style={[s.overlayCell, overlayMode === opt.mode && s.overlayCellActive]}
+                    onPress={() => { setOverlayMode(opt.mode); setOverlayPickerOpen(false); }}
+                  >
+                    <Text style={s.overlayCellIcon}>{opt.icon}</Text>
+                    <Text style={[s.overlayCellLabel, overlayMode === opt.mode && { color: "#000" }]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ── Exposure column (slider + lock) ── */}
+          <View style={s.expColumn}>
+            <TouchableOpacity style={s.expLockBtn} onPress={toggleExpLock}>
+              <Text style={{ fontSize: 13 }}>{expLocked ? "🔒" : "🔓"}</Text>
+            </TouchableOpacity>
+            <View style={[s.expPill, expLocked && s.expPillLocked]} {...expPan.panHandlers}>
+              <Text style={s.expIcon}>☀</Text>
+              <View style={s.expTrack}>
+                <View style={[s.expFill, { height: `${(exposure + 1) * 50}%` }]} />
+              </View>
+              <Text style={s.expVal}>
+                {exposure > 0 ? "+" : ""}{Math.round(exposure * 10) / 10}
+              </Text>
+            </View>
+            {expLocked && (
+              <View style={s.expLockedBadge}>
+                <Text style={s.expLockedBadgeText}>EXP{"\n"}LOCK</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Demo mode badge */}
+          <View style={{ position: "absolute", bottom: 16, left: 16, backgroundColor: "rgba(0,0,0,0.6)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 }}>
+            <Text style={{ color: "#FFD700", fontSize: 12, fontWeight: "600" }}>DEMO MODE</Text>
+          </View>
+
+          {/* Toast */}
+          {showToast && (
+            <View style={s.toast}>
+              <Text style={s.toastText}>{toastMsg}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* ── Bottom controls ── */}
+        <View style={s.bottomBar}>
+          {/* Gallery thumbnail */}
+          <TouchableOpacity style={s.galleryBtn} onPress={() => setGalleryVisible(true)}>
+            {capturedMedia.length > 0 ? (
+              <Image source={{ uri: capturedMedia[capturedMedia.length - 1].uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, { justifyContent: "center", alignItems: "center", backgroundColor: "#1a1a1a" }]} />
+            )}
+            <Text style={{ fontSize: 22 }}>🖼</Text>
+            {captureCount > 0 && (
+              <View style={s.badge}>
+                <Text style={s.badgeText}>{captureCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Shutter / record button */}
+          <TouchableOpacity
+            style={s.shutter}
+            onPress={() => showToastMsg_Demo("Demo: Photo capture disabled on web")}
+          >
+            <View style={[s.shutterInner, { backgroundColor: "#fff" }]} />
+          </TouchableOpacity>
+
+          {/* Mode toggle (photo ↔ video) + flip */}
+          <View style={{ alignItems: "center", gap: 6 }}>
+            <TouchableOpacity
+              style={s.flipBtn}
+              onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}
+            >
+              <Text style={{ fontSize: 22, color: "white" }}>↺</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.modeToggleBtn}
+              onPress={() => {
+                setCameraMode((m) => (m === "photo" ? "video" : "photo"));
+              }}
+            >
+              <Text style={s.modeToggleTxt}>
+                {cameraMode === "photo" ? "🎬" : "📷"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Mode label ── */}
+        <Text style={s.modeLabelBottom}>
+          {cameraMode === "photo" ? "PHOTO" : "VIDEO"}
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
+  // ─── NATIVE PLATFORM CODE ────────────────────────────────────────────────
+  const cameraRef = useRef<any>(null);
+  const visionCamera = require("react-native-vision-camera");
+  const { Camera } = visionCamera;
+  const { useCameraDevice } = visionCamera;
+  const { useCameraPermission } = visionCamera;
+  const { useMicrophonePermission } = visionCamera;
+
+  const device = useCameraDevice(facing);
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const { requestPermission: requestMicPerm } = useMicrophonePermission();
+  const [mediaLibraryPermission, requestMediaLibraryPermission] =
+    MediaLibrary.usePermissions();
+
+  const isFocused = useIsFocused();
 
   // AI Coach
   const { score, tip, scoreColor, autoFire } = useAICoach({

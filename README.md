@@ -1,22 +1,77 @@
-# Welcome to your Expo app 👋
+# AISnaps
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+AISnaps is a mobile-first Expo camera app built to teach better photography through live composition overlays, AI coaching, and capture guidance.
 
-## Get started
+## Current status
 
-1. Install dependencies
+- **Mobile focus:** The app is built for Android/iOS with Expo and `react-native-vision-camera`.
+- **Web demo:** The browser version runs as a demo mode with a mock camera preview and UI controls.
+- **Main screen:** `app/index.tsx` contains the core experience including overlays, AI coaching, and gallery.
 
-   ```bash
-   npm install
-   ```
+## Priority roadmap
 
-2. Start the app
+1. Validate mobile camera capture and recording on device.
+2. Separate web/demo mode cleanly from native camera logic.
+3. Align Expo dependency versions to expected compatibility.
+4. Polish the web demo experience and messaging.
+5. Add permission and runtime error handling.
+6. Improve onboarding, AI guidance, and gallery UX.
 
-   ```bash
-   npx expo start
-   ```
+## Run locally
 
-In the output, you'll find options to open the app in a
+Install dependencies:
+
+```bash
+npm install
+```
+
+Start the app:
+
+```bash
+npm start
+```
+
+Run the web demo:
+
+```bash
+npm run web
+```
+
+Then open `http://localhost:8081` in Chrome.
+
+## What works today
+
+- Main camera screen UI and layout
+- Composition overlay rendering
+- AI coach interface and mode toggle
+- Web demo mode with mock camera preview
+- Basic gallery modal and thumbnail support
+
+## What is still pending
+
+- Real camera capture on Android/iOS
+- Video recording flow on device
+- Microphone permission handling
+- Web gallery mock data and interactions
+- Expo dependency updates
+- Clear web messaging for unsupported camera features
+
+## Project structure
+
+- `app/` — main app screen and logic
+- `components/` — reusable UI components
+- `constants/` — shared config values
+- `hooks/` — custom hooks and feature logic
+- `assets/` — static media
+- `package.json` — dependencies and scripts
+
+## Notes for contributors
+
+- Keep web and native logic separated.
+- Avoid loading native camera modules on web.
+- Maintain overlay rendering as platform-agnostic.
+- Track current implementation context in `memory.md`.
+- Update this README when the workflow changes.
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
