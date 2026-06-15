@@ -2,3 +2,5 @@
 data/
 .venv/
 __pycache__/
+# NIMA weights — large, download separately (see README)
+models/
