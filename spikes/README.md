@@ -42,6 +42,13 @@ Drop inputs in `spikes/data/`:
 - `selfies/` — ~50 real selfies (good/bad spread).
 - `labels.csv` — columns: `filename,human_score` (1–10, averaged across 2–3 raters).
 
+NIMA weights (optional — heuristics run without them; enables the NIMA blend term):
+
+- Download `mobilenet_aesthetic_0.07.hdf5` from
+  [idealo/image-quality-assessment](https://github.com/idealo/image-quality-assessment).
+- Place at `spikes/models/mobilenet_aesthetic.hdf5` (or set `NIMA_WEIGHTS` env var).
+- `models/` is gitignored — weights are large, not committed.
+
 Output: per-image score table + Spearman correlation (NIMA-alone vs blend) vs human.
 
 Success: blend Spearman rho >= 0.6. If it fails, escalate to earlier NIMA fine-tune.

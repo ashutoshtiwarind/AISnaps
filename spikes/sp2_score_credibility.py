@@ -147,15 +147,62 @@ def compute_background_clean(img_bgr, bbox):
     return float(np.clip(1.0 - clutter * 5.0, 0.0, 1.0))
 
 
-# %% NIMA aesthetic score
+# %% NIMA aesthetic score (TF/Keras MobileNet, AVA-trained)
+#
+# Path chosen for SP-2a: idealo image-quality-assessment NIMA.
+#   Architecture: MobileNet(include_top=False, pooling='avg') -> Dropout -> Dense(10, softmax).
+#   Output = probability over buckets 1..10; mean = sum(i * p_i) is the aesthetic score.
+#   Weights (AVA-trained) download once, not committed (PII-free but large):
+#     spikes/models/mobilenet_aesthetic.hdf5  (or set NIMA_WEIGHTS env var)
+#   Source weights: github.com/idealo/image-quality-assessment (mobilenet_aesthetic_0.07.hdf5)
+#
+# If TensorFlow or the weights are missing, compute_nima returns NaN so the blend
+# falls back to heuristics-only and we still get a (partial) correlation.
+
+import os
+
+NIMA_WEIGHTS = Path(os.environ.get("NIMA_WEIGHTS", Path(__file__).parent / "models" / "mobilenet_aesthetic.hdf5"))
+
+_nima_model = None        # lazy singleton
+_nima_unavailable = False  # warn once, then stay quiet
+
+
+def _load_nima_model():
+    global _nima_model, _nima_unavailable
+    if _nima_model is not None or _nima_unavailable:
+        return _nima_model
+    try:
+        import tensorflow as tf  # noqa: PLC0415 (lazy: keep heuristics runnable without TF)
+
+        base = tf.keras.applications.MobileNet(
+            input_shape=(224, 224, 3), include_top=False, pooling="avg", weights=None
+        )
+        x = tf.keras.layers.Dropout(0.75)(base.output)
+        x = tf.keras.layers.Dense(10, activation="softmax")(x)
+        model = tf.keras.Model(base.input, x)
+        if not NIMA_WEIGHTS.exists():
+            raise FileNotFoundError(f"NIMA weights not found at {NIMA_WEIGHTS} (see spikes/README.md)")
+        model.load_weights(str(NIMA_WEIGHTS))
+        _nima_model = model
+    except Exception as e:  # TF missing, weights missing, arch mismatch
+        _nima_unavailable = True
+        print(f"[nima] disabled, blend will run heuristics-only: {e}")
+    return _nima_model
+
+
 def compute_nima(img_bgr):
-    """
-    TODO (SP-2): load pretrained NIMA (AVA) and return mean aesthetic score
-    normalized to 0..1. Path chosen during the spike (tensorflow weights or torch
-    port — see requirements.txt). Until then returns NaN so the blend can run on
-    heuristics alone and we isolate NIMA's marginal contribution.
-    """
-    return float("nan")
+    """Mean NIMA aesthetic score normalized to 0..1, or NaN if model unavailable."""
+    model = _load_nima_model()
+    if model is None:
+        return float("nan")
+    import tensorflow as tf  # noqa: PLC0415
+
+    rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    resized = cv2.resize(rgb, (224, 224)).astype("float32")
+    batch = tf.keras.applications.mobilenet.preprocess_input(resized[None, ...])
+    probs = model.predict(batch, verbose=0)[0]      # shape (10,), buckets 1..10
+    mean_score = float(np.dot(np.arange(1, 11), probs))  # 1..10
+    return float(np.clip((mean_score - 1.0) / 9.0, 0.0, 1.0))
 
 
 # %% score one image
