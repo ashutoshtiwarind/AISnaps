@@ -70,8 +70,13 @@ Then open `http://localhost:8081` in Chrome.
 - Keep web and native logic separated.
 - Avoid loading native camera modules on web.
 - Maintain overlay rendering as platform-agnostic.
-- Track current implementation context in `memory.md`.
+- Track current implementation context in `PROJECT_TRACKING.md`.
 - Update this README when the workflow changes.
+- Use role-specific skill files as guidance:
+  - `SKILL-spm.md` for product and roadmap planning.
+  - `SKILL-designer.md` for UI/UX and design decisions.
+  - `SKILL-tl.md` for technical leadership and implementation strategy.
+  - `SKILL-qa.md` for quality assurance and validation.
 
 - [development build](https://docs.expo.dev/develop/development-builds/introduction/)
 - [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
