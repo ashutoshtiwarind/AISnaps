@@ -48,9 +48,9 @@
 
 | ID | Item | Owner | Status | Notes |
 |----|------|-------|--------|-------|
-| R-1 | Daily streak | TL | todo | |
-| R-2 | "Beat your best score" | TL + Designer | todo | |
-| R-3 | Angle/pose library | Designer + ML | todo | |
+| R-1 | Daily streak | TL | in-progress | `lib/stats.ts` + `lib/storage.ts` (web localStorage / native expo-file-system); streak chip on reveal. No new deps |
+| R-2 | "Beat your best score" | TL + Designer | in-progress | bestScore persisted; "New best 🎉" badge on reveal |
+| R-3 | Angle/pose library | Designer + ML | todo | Static content + screen; next slice |
 
 ## Phase 4 — Monetize
 

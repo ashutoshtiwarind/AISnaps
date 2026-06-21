@@ -38,6 +38,7 @@ import { ScoreCard } from "../components/ScoreCard";
 import { useAICoach } from "../hooks/useAICoach";
 import { improvedMetrics, mockMetrics, PhotoMetrics, PhotoScore, scorePhoto } from "../lib/photoScore";
 import { ShareResult, shareScore } from "../lib/share";
+import { EMPTY_STATS, loadStats, recordShot, UserStats } from "../lib/stats";
 import { SCRIPTS } from "../scripts/scripts";
 
 const { width } = Dimensions.get("window");
@@ -52,7 +53,14 @@ const SHARE_TOAST: Record<ShareResult, string> = {
 
 // Post-capture score reveal (C-4). `reveal` drives the ScoreCard modal.
 type RevealState =
-  | { photoUri: string; score: PhotoScore; beforeUri?: string; beforeScore?: PhotoScore }
+  | {
+      photoUri: string;
+      score: PhotoScore;
+      beforeUri?: string;
+      beforeScore?: PhotoScore;
+      isNewBest?: boolean;
+      streak?: number;
+    }
   | null;
 
 // Neutral placeholder for the web demo (no real capture, no network).
@@ -82,6 +90,8 @@ function RevealModal({
             score={state.score}
             beforeUri={state.beforeUri}
             beforeScore={state.beforeScore}
+            isNewBest={state.isNewBest}
+            streak={state.streak}
             onClose={onClose}
             onRetake={onRetake}
             onShare={onShare}
@@ -383,6 +393,12 @@ export default function HomeScreen() {
   const [reveal, setReveal] = useState<RevealState>(null);
   const lastShotRef = useRef<{ metrics: PhotoMetrics; score: PhotoScore; uri: string } | null>(null);
 
+  // Retention stats (R-1 streak, R-2 beat-your-best). statsRef avoids stale closures.
+  const statsRef = useRef<UserStats>(EMPTY_STATS);
+  useEffect(() => {
+    loadStats().then((st) => { statsRef.current = st; });
+  }, []);
+
   // Web demo mode
   if (isWeb) {
     const isFocused = useIsFocused();
@@ -419,11 +435,20 @@ export default function HomeScreen() {
 
     // Demo capture: score a mock shot, reveal it; each subsequent shot improves
     // on the last so the before/after glow-up loop is visible without hardware.
-    const runDemoCapture = () => {
+    const runDemoCapture = async () => {
       const prev = lastShotRef.current;
       const metrics = prev ? improvedMetrics(prev.metrics) : mockMetrics();
       const score = scorePhoto(metrics);
-      setReveal({ photoUri: DEMO_PHOTO, score, beforeUri: prev?.uri, beforeScore: prev?.score });
+      const outcome = await recordShot(score, statsRef.current);
+      statsRef.current = outcome.stats;
+      setReveal({
+        photoUri: DEMO_PHOTO,
+        score,
+        beforeUri: prev?.uri,
+        beforeScore: prev?.score,
+        isNewBest: outcome.isNewBest,
+        streak: outcome.stats.streak,
+      });
       lastShotRef.current = { metrics, score, uri: DEMO_PHOTO };
     };
 
@@ -711,11 +736,15 @@ export default function HomeScreen() {
         const prevShot = lastShotRef.current;
         const metrics = prevShot ? improvedMetrics(prevShot.metrics) : mockMetrics();
         const photoScoreResult = scorePhoto(metrics);
+        const outcome = await recordShot(photoScoreResult, statsRef.current);
+        statsRef.current = outcome.stats;
         setReveal({
           photoUri: savedUri,
           score: photoScoreResult,
           beforeUri: prevShot?.uri,
           beforeScore: prevShot?.score,
+          isNewBest: outcome.isNewBest,
+          streak: outcome.stats.streak,
         });
         lastShotRef.current = { metrics, score: photoScoreResult, uri: savedUri };
 
