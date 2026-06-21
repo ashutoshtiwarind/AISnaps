@@ -40,9 +40,9 @@
 
 | ID | Item | Owner | Status | Notes |
 |----|------|-------|--------|-------|
-| S-1 | Branded score card | Designer | todo | The viral artifact |
-| S-2 | Before/after export tuned for TikTok/IG | TL + Designer | todo | Aspect ratios, watermark |
-| S-3 | Share flow (native share sheet) | TL | todo | |
+| S-1 | Branded score card | Designer | in-progress | Wordmark + handle watermark on ScoreCard; screenshot-worthy. Dedicated 9:16/1:1 export layout folded into S-2 |
+| S-2 | Before/after image export tuned for TikTok/IG | TL + Designer | todo | Rasterize card → image (react-native-view-shot) at 9:16 / 1:1; needs dev build to verify |
+| S-3 | Share flow (native share sheet) | TL | in-progress | `lib/share.ts` wired: web navigator.share + clipboard fallback, native built-in Share (text+link). No new deps |
 
 ## Phase 3 — Retention
 

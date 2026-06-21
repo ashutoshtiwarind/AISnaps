@@ -37,10 +37,18 @@ const mockCamera = {
 import { ScoreCard } from "../components/ScoreCard";
 import { useAICoach } from "../hooks/useAICoach";
 import { improvedMetrics, mockMetrics, PhotoMetrics, PhotoScore, scorePhoto } from "../lib/photoScore";
+import { ShareResult, shareScore } from "../lib/share";
 import { SCRIPTS } from "../scripts/scripts";
 
 const { width } = Dimensions.get("window");
 const THUMB_SIZE = (width - 48) / 3;
+
+const SHARE_TOAST: Record<ShareResult, string> = {
+  shared: "Shared ✓",
+  copied: "Link copied",
+  dismissed: "Share cancelled",
+  unavailable: "Sharing not available",
+};
 
 // Post-capture score reveal (C-4). `reveal` drives the ScoreCard modal.
 type RevealState =
@@ -603,7 +611,10 @@ export default function HomeScreen() {
           state={reveal}
           onClose={() => setReveal(null)}
           onRetake={() => setReveal(null)}
-          onShare={() => { setReveal(null); showToastMsg("Shared — demo"); }}
+          onShare={() => {
+            const sc = reveal?.score;
+            if (sc) shareScore(sc).then((r) => showToastMsg(SHARE_TOAST[r]));
+          }}
         />
       </SafeAreaView>
     );
