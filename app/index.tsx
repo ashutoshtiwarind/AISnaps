@@ -34,6 +34,7 @@ const mockCamera = {
   useMicrophonePermission: () => ({ requestPermission: async () => {} }),
 };
 
+import { AngleLibrary } from "../components/AngleLibrary";
 import { ScoreCard } from "../components/ScoreCard";
 import { useAICoach } from "../hooks/useAICoach";
 import { improvedMetrics, mockMetrics, PhotoMetrics, PhotoScore, scorePhoto } from "../lib/photoScore";
@@ -393,6 +394,9 @@ export default function HomeScreen() {
   const [reveal, setReveal] = useState<RevealState>(null);
   const lastShotRef = useRef<{ metrics: PhotoMetrics; score: PhotoScore; uri: string } | null>(null);
 
+  // Angle/pose library (R-3)
+  const [libraryOpen, setLibraryOpen] = useState(false);
+
   // Retention stats (R-1 streak, R-2 beat-your-best). statsRef avoids stale closures.
   const statsRef = useRef<UserStats>(EMPTY_STATS);
   useEffect(() => {
@@ -498,6 +502,13 @@ export default function HomeScreen() {
             )}
 
             <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity
+                style={s.iconBtn}
+                onPress={() => setLibraryOpen(true)}
+                accessibilityLabel="Angle and pose library"
+              >
+                <Text style={s.iconTxt}>🎭</Text>
+              </TouchableOpacity>
               {cameraMode === "photo" && (
                 <TouchableOpacity style={s.iconBtn} onPress={cycleFlash}>
                   <Text style={[s.iconTxt, { color: FLASH_COLORS[flashMode] }]}>
@@ -641,6 +652,8 @@ export default function HomeScreen() {
             if (sc) shareScore(sc).then((r) => showToastMsg(SHARE_TOAST[r]));
           }}
         />
+
+        <AngleLibrary visible={libraryOpen} onClose={() => setLibraryOpen(false)} />
       </SafeAreaView>
     );
   }
@@ -939,6 +952,13 @@ export default function HomeScreen() {
           )}
 
           <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
+              style={s.iconBtn}
+              onPress={() => setLibraryOpen(true)}
+              accessibilityLabel="Angle and pose library"
+            >
+              <Text style={s.iconTxt}>🎭</Text>
+            </TouchableOpacity>
             {/* Flash — cycles Off → Auto → On (hidden in video mode) */}
             {cameraMode === "photo" && (
               <TouchableOpacity style={s.iconBtn} onPress={cycleFlash}>
@@ -1267,8 +1287,13 @@ export default function HomeScreen() {
         state={reveal}
         onClose={() => setReveal(null)}
         onRetake={() => setReveal(null)}
-        onShare={() => { setReveal(null); showToastMsg("Shared — demo"); }}
+        onShare={() => {
+          const sc = reveal?.score;
+          if (sc) shareScore(sc).then((r) => showToastMsg(SHARE_TOAST[r]));
+        }}
       />
+
+      <AngleLibrary visible={libraryOpen} onClose={() => setLibraryOpen(false)} />
     </SafeAreaView>
   );
 }
