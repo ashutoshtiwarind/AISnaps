@@ -31,9 +31,9 @@
 |----|------|-------|--------|-------|
 | C-1 | Hot loop: pose/face landmarks → geometry → directional cue (rule-based, on-device) | ML + TL | todo | D-1, D-2; ~15fps, no inference in hot path |
 | C-2 | Auto-capture at peak frame | TL | todo | D-4; blendshapes (eyes/smile) + low motion + framing → burst 3 → best NIMA |
-| C-3 | Score: NIMA blended with portrait heuristics | ML | todo | D-3; photo not face; gated by SP-2 |
-| C-4 | Before/after result card | Designer + TL | todo | Score the photo, not the face |
-| C-5 | Single-button capture UX | Designer + TL | todo | Minimize cognitive load |
+| C-3 | Score: NIMA blended with portrait heuristics | ML | in-progress | Blend module built (`lib/photoScore.ts`, mirrors SP-2 weights). Real metrics gated by C-1/SP-1; NIMA optional |
+| C-4 | Before/after result card | Designer + TL | in-progress | `components/ScoreCard.tsx` built + wired: web demo runs the glow-up loop; native uses real photo + mock metrics until C-1 |
+| C-5 | Single-button capture UX | Designer + TL | in-progress | Web shutter triggers the reveal; one-button flow in place |
 | C-6 | Claude vision narration loop (throttled) | ML | todo | D-5; ≤1 call / 1–2s, downscaled frame + metrics |
 
 ## Phase 2 — Shareable artifact

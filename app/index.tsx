@@ -34,11 +34,55 @@ const mockCamera = {
   useMicrophonePermission: () => ({ requestPermission: async () => {} }),
 };
 
+import { ScoreCard } from "../components/ScoreCard";
 import { useAICoach } from "../hooks/useAICoach";
+import { improvedMetrics, mockMetrics, PhotoMetrics, PhotoScore, scorePhoto } from "../lib/photoScore";
 import { SCRIPTS } from "../scripts/scripts";
 
 const { width } = Dimensions.get("window");
 const THUMB_SIZE = (width - 48) / 3;
+
+// Post-capture score reveal (C-4). `reveal` drives the ScoreCard modal.
+type RevealState =
+  | { photoUri: string; score: PhotoScore; beforeUri?: string; beforeScore?: PhotoScore }
+  | null;
+
+// Neutral placeholder for the web demo (no real capture, no network).
+const DEMO_PHOTO =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160"><rect width="120" height="160" fill="#2a2a2a"/><text x="60" y="84" fill="#777" font-size="11" text-anchor="middle">DEMO</text></svg>',
+  );
+
+function RevealModal({
+  state,
+  onClose,
+  onShare,
+  onRetake,
+}: {
+  state: RevealState;
+  onClose: () => void;
+  onShare: () => void;
+  onRetake: () => void;
+}) {
+  return (
+    <Modal visible={!!state} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={s.revealBackdrop}>
+        {state && (
+          <ScoreCard
+            photoUri={state.photoUri}
+            score={state.score}
+            beforeUri={state.beforeUri}
+            beforeScore={state.beforeScore}
+            onClose={onClose}
+            onRetake={onRetake}
+            onShare={onShare}
+          />
+        )}
+      </View>
+    </Modal>
+  );
+}
 
 type FlashMode = "off" | "auto" | "on";
 type OverlayMode =
@@ -327,6 +371,10 @@ export default function HomeScreen() {
   const expStartY = useRef(0);
   const [expLocked, setExpLocked] = useState(false);
 
+  // Post-capture score reveal (C-4). lastShotRef enables the before/after glow-up.
+  const [reveal, setReveal] = useState<RevealState>(null);
+  const lastShotRef = useRef<{ metrics: PhotoMetrics; score: PhotoScore; uri: string } | null>(null);
+
   // Web demo mode
   if (isWeb) {
     const isFocused = useIsFocused();
@@ -360,6 +408,16 @@ export default function HomeScreen() {
     }, [viewSize.w, viewSize.h]);
 
     const showToastMsg_Demo = (msg: string) => showToastMsg(msg);
+
+    // Demo capture: score a mock shot, reveal it; each subsequent shot improves
+    // on the last so the before/after glow-up loop is visible without hardware.
+    const runDemoCapture = () => {
+      const prev = lastShotRef.current;
+      const metrics = prev ? improvedMetrics(prev.metrics) : mockMetrics();
+      const score = scorePhoto(metrics);
+      setReveal({ photoUri: DEMO_PHOTO, score, beforeUri: prev?.uri, beforeScore: prev?.score });
+      lastShotRef.current = { metrics, score, uri: DEMO_PHOTO };
+    };
 
     return (
       <SafeAreaView style={s.container}>
@@ -511,10 +569,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           {/* Shutter / record button */}
-          <TouchableOpacity
-            style={s.shutter}
-            onPress={() => showToastMsg_Demo("Demo: Photo capture disabled on web")}
-          >
+          <TouchableOpacity style={s.shutter} onPress={runDemoCapture}>
             <View style={[s.shutterInner, { backgroundColor: "#fff" }]} />
           </TouchableOpacity>
 
@@ -543,6 +598,13 @@ export default function HomeScreen() {
         <Text style={s.modeLabelBottom}>
           {cameraMode === "photo" ? "PHOTO" : "VIDEO"}
         </Text>
+
+        <RevealModal
+          state={reveal}
+          onClose={() => setReveal(null)}
+          onRetake={() => setReveal(null)}
+          onShare={() => { setReveal(null); showToastMsg("Shared — demo"); }}
+        />
       </SafeAreaView>
     );
   }
@@ -632,7 +694,21 @@ export default function HomeScreen() {
           : fileUri;
         setCapturedMedia((p) => [{ uri: savedUri, type: "photo" }, ...p]);
         setCaptureCount((c) => c + 1);
-        showToastMsg(isAuto ? `Auto shot! Score: ${Math.round(scoreRef.current)}` : "Saved ✓");
+
+        // Post-capture score reveal (C-4). Metrics are mocked until the hot loop
+        // (C-1) lands real framing metrics — gated by SP-1. The photo itself is real.
+        const prevShot = lastShotRef.current;
+        const metrics = prevShot ? improvedMetrics(prevShot.metrics) : mockMetrics();
+        const photoScoreResult = scorePhoto(metrics);
+        setReveal({
+          photoUri: savedUri,
+          score: photoScoreResult,
+          beforeUri: prevShot?.uri,
+          beforeScore: prevShot?.score,
+        });
+        lastShotRef.current = { metrics, score: photoScoreResult, uri: savedUri };
+
+        showToastMsg(isAuto ? `Auto shot! Score: ${photoScoreResult.overall}` : "Saved ✓");
       } catch (e: any) {
         showToastMsg("Capture failed");
         console.log("Capture error:", e?.message);
@@ -1146,6 +1222,13 @@ export default function HomeScreen() {
           )}
         </View>
       </Modal>
+
+      <RevealModal
+        state={reveal}
+        onClose={() => setReveal(null)}
+        onRetake={() => setReveal(null)}
+        onShare={() => { setReveal(null); showToastMsg("Shared — demo"); }}
+      />
     </SafeAreaView>
   );
 }
@@ -1228,6 +1311,7 @@ const s = StyleSheet.create({
 
   // Bottom panel
   bottom: { backgroundColor: "#111", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  bottomBar: { backgroundColor: "#111", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
   settingsToggle: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   settingsToggleText: { fontSize: 11, color: "rgba(255,255,255,0.5)" },
   settingsPanel: { backgroundColor: "#1a1a1a", borderRadius: 12, padding: 14, marginBottom: 12 },
@@ -1263,6 +1347,9 @@ const s = StyleSheet.create({
   modeToggleBtn: { width: 44, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center" },
   modeToggleTxt: { fontSize: 16 },
   modeLabelBottom: { textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 9, letterSpacing: 2, marginBottom: 2 },
+
+  // Score reveal (C-4)
+  revealBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", padding: 16 },
 
   // Gallery modal
   galleryModal: { flex: 1, backgroundColor: "#0a0a0a" },
