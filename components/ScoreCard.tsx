@@ -16,6 +16,7 @@ import {
 } from "react-native";
 
 import { PhotoScore, topFix } from "@/lib/photoScore";
+import { HANDLE } from "@/lib/share";
 
 interface Props {
   photoUri: string;
@@ -59,6 +60,11 @@ export function ScoreCard({
       <TouchableOpacity style={st.close} onPress={onClose} accessibilityLabel="Close">
         <Text style={st.closeText}>✕</Text>
       </TouchableOpacity>
+
+      {/* Brand wordmark — makes the card shareable/screenshot-worthy (S-1) */}
+      <Text style={st.wordmark}>
+        AI<Text style={st.wordmarkAccent}>Snaps</Text>
+      </Text>
 
       {/* Before / after */}
       <View style={st.photoRow}>
@@ -121,6 +127,9 @@ export function ScoreCard({
           <Text style={st.btnPrimaryText}>Share</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Handle watermark */}
+      <Text style={st.watermark}>{HANDLE} · aisnaps.app</Text>
     </View>
   );
 }
@@ -153,6 +162,10 @@ const st = StyleSheet.create({
   container: { backgroundColor: "#0a0a0a", borderRadius: 20, padding: 20, gap: 14 },
   close: { position: "absolute", top: 12, right: 12, zIndex: 2, width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.1)", justifyContent: "center", alignItems: "center" },
   closeText: { color: "white", fontSize: 16 },
+
+  wordmark: { fontSize: 15, fontWeight: "800", color: "#fff", letterSpacing: 0.5 },
+  wordmarkAccent: { color: "#FFD700" },
+  watermark: { textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.3)", letterSpacing: 0.5, marginTop: 2 },
 
   photoRow: { flexDirection: "row", gap: 8, justifyContent: "center" },
   photoCol: { flex: 1, maxWidth: 180 },
