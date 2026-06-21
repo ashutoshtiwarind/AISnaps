@@ -50,7 +50,7 @@
 |----|------|-------|--------|-------|
 | R-1 | Daily streak | TL | in-progress | `lib/stats.ts` + `lib/storage.ts` (web localStorage / native expo-file-system); streak chip on reveal. No new deps |
 | R-2 | "Beat your best score" | TL + Designer | in-progress | bestScore persisted; "New best 🎉" badge on reveal |
-| R-3 | Angle/pose library | Designer + ML | todo | Static content + screen; next slice |
+| R-3 | Angle/pose library | Designer + ML | in-progress | `lib/poses.ts` + `components/AngleLibrary.tsx` (browse + category filter); top-bar entry. "Try pose → overlay" tie-in gated by C-1 |
 
 ## Phase 4 — Monetize
 
