@@ -23,6 +23,8 @@ interface Props {
   score: PhotoScore;
   beforeUri?: string;
   beforeScore?: PhotoScore;
+  isNewBest?: boolean; // R-2
+  streak?: number; // R-1
   onShare?: () => void;
   onRetake?: () => void;
   onClose?: () => void;
@@ -33,6 +35,8 @@ export function ScoreCard({
   score,
   beforeUri,
   beforeScore,
+  isNewBest,
+  streak,
   onShare,
   onRetake,
   onClose,
@@ -91,6 +95,20 @@ export function ScoreCard({
       {delta != null && delta > 0 ? (
         <Text style={st.delta}>▲ +{delta} from your last shot</Text>
       ) : null}
+
+      {/* Retention beats (R-1 / R-2) */}
+      <View style={st.retentionRow}>
+        {isNewBest ? (
+          <View style={st.newBestBadge}>
+            <Text style={st.newBestText}>🎉 New best</Text>
+          </View>
+        ) : null}
+        {streak && streak > 1 ? (
+          <View style={st.streakChip}>
+            <Text style={st.streakText}>🔥 {streak}-day streak</Text>
+          </View>
+        ) : null}
+      </View>
 
       {/* Top fix */}
       {fix ? (
@@ -178,6 +196,12 @@ const st = StyleSheet.create({
   scoreOutOf: { fontSize: 18, color: "rgba(255,255,255,0.4)", marginBottom: 10 },
   headline: { textAlign: "center", fontSize: 16, fontWeight: "700" },
   delta: { textAlign: "center", fontSize: 12, color: "#4ADE80", fontWeight: "600" },
+
+  retentionRow: { flexDirection: "row", gap: 8, justifyContent: "center", flexWrap: "wrap" },
+  newBestBadge: { backgroundColor: "#FFD700", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  newBestText: { color: "#000", fontSize: 11, fontWeight: "800", letterSpacing: 0.3 },
+  streakChip: { backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 14, paddingHorizontal: 10, paddingVertical: 4 },
+  streakText: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: "600" },
 
   fixRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", flexWrap: "wrap" },
   fixLabel: { color: "rgba(255,255,255,0.5)", fontSize: 13 },
