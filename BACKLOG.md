@@ -68,3 +68,4 @@
 | T-4 | Confirm on-device vs cloud per-frame split | ML + TL | todo | Hybrid; see STRATEGY §4 |
 | T-5 | Migrate capture path expo-camera → vision-camera | TL | todo | Hot loop (C-1) needs frame processors; expo-camera can't. Gated by SP-1 |
 | T-6 | vision-camera config plugin in app.json | TL | done | Camera permission + frame processors; mic disabled for Phase 1 |
+| T-7 | Demo polish for V-1: onboarding + stats strip + clean typecheck | TL + Designer | done | First-run "how it works", persistent best·streak pill; `tsc` now clean (fixed spread + implicit-any). Makes web demo recordable |

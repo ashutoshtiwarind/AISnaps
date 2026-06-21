@@ -35,11 +35,13 @@ const mockCamera = {
 };
 
 import { AngleLibrary } from "../components/AngleLibrary";
+import { Onboarding } from "../components/Onboarding";
 import { ScoreCard } from "../components/ScoreCard";
 import { useAICoach } from "../hooks/useAICoach";
 import { improvedMetrics, mockMetrics, PhotoMetrics, PhotoScore, scorePhoto } from "../lib/photoScore";
 import { ShareResult, shareScore } from "../lib/share";
 import { EMPTY_STATS, loadStats, recordShot, UserStats } from "../lib/stats";
+import { getItem, setItem } from "../lib/storage";
 import { SCRIPTS } from "../scripts/scripts";
 
 const { width } = Dimensions.get("window");
@@ -397,11 +399,32 @@ export default function HomeScreen() {
   // Angle/pose library (R-3)
   const [libraryOpen, setLibraryOpen] = useState(false);
 
-  // Retention stats (R-1 streak, R-2 beat-your-best). statsRef avoids stale closures.
-  const statsRef = useRef<UserStats>(EMPTY_STATS);
-  useEffect(() => {
-    loadStats().then((st) => { statsRef.current = st; });
+  // First-run onboarding (demo polish)
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const finishOnboarding = useCallback(() => {
+    setItem("onboarded_v1", "1");
+    setShowOnboarding(false);
   }, []);
+
+  // Retention stats (R-1 streak, R-2 beat-your-best). statsRef avoids stale closures;
+  // statsView drives the on-screen strip.
+  const statsRef = useRef<UserStats>(EMPTY_STATS);
+  const [statsView, setStatsView] = useState<UserStats>(EMPTY_STATS);
+  useEffect(() => {
+    loadStats().then((st) => { statsRef.current = st; setStatsView(st); });
+    getItem("onboarded_v1").then((v) => { if (!v) setShowOnboarding(true); });
+  }, []);
+
+  // Persistent best · streak pill (demo polish). Shown once the user has shot.
+  const renderStatsStrip = () =>
+    statsView.shotCount > 0 ? (
+      <View style={s.statsStrip} pointerEvents="none">
+        <Text style={s.statsStripText}>
+          ⭐ {statsView.bestScore.toFixed(1)} best
+          {statsView.streak > 1 ? `   🔥 ${statsView.streak}-day streak` : ""}
+        </Text>
+      </View>
+    ) : null;
 
   // Web demo mode
   if (isWeb) {
@@ -445,6 +468,7 @@ export default function HomeScreen() {
       const score = scorePhoto(metrics);
       const outcome = await recordShot(score, statsRef.current);
       statsRef.current = outcome.stats;
+      setStatsView(outcome.stats);
       setReveal({
         photoUri: DEMO_PHOTO,
         score,
@@ -471,7 +495,7 @@ export default function HomeScreen() {
           {/* Mock camera background */}
           <View
             style={{
-              ...StyleSheet.absoluteFill,
+              ...StyleSheet.absoluteFillObject,
               backgroundColor: "#1a1a1a",
               justifyContent: "center",
               alignItems: "center",
@@ -482,6 +506,8 @@ export default function HomeScreen() {
 
           {/* Frame overlay - REAL RENDERING */}
           <GridOverlay mode={overlayMode} viewW={viewSize.w} viewH={viewSize.h} />
+
+          {renderStatsStrip()}
 
           {/* Focus ring */}
           {focusPoint && (
@@ -654,6 +680,8 @@ export default function HomeScreen() {
         />
 
         <AngleLibrary visible={libraryOpen} onClose={() => setLibraryOpen(false)} />
+
+        <Onboarding visible={showOnboarding} onDone={finishOnboarding} />
       </SafeAreaView>
     );
   }
@@ -751,6 +779,7 @@ export default function HomeScreen() {
         const photoScoreResult = scorePhoto(metrics);
         const outcome = await recordShot(photoScoreResult, statsRef.current);
         statsRef.current = outcome.stats;
+        setStatsView(outcome.stats);
         setReveal({
           photoUri: savedUri,
           score: photoScoreResult,
@@ -800,7 +829,7 @@ export default function HomeScreen() {
     recTimerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
 
     cameraRef.current.startRecording({
-      onRecordingFinished: async (video) => {
+      onRecordingFinished: async (video: any) => {
         clearInterval(recTimerRef.current!);
         setIsRecording(false);
         setRecSeconds(0);
@@ -811,7 +840,7 @@ export default function HomeScreen() {
         setCaptureCount((c) => c + 1);
         showToastMsg("Saved ✓");
       },
-      onRecordingError: (e) => {
+      onRecordingError: (e: any) => {
         clearInterval(recTimerRef.current!);
         setIsRecording(false);
         console.log("Recording error:", e);
@@ -931,6 +960,8 @@ export default function HomeScreen() {
 
         {/* Frame overlay */}
         <GridOverlay mode={overlayMode} viewW={viewSize.w} viewH={viewSize.h} />
+
+        {renderStatsStrip()}
 
         {/* Focus ring */}
         {focusPoint && (
@@ -1294,6 +1325,8 @@ export default function HomeScreen() {
       />
 
       <AngleLibrary visible={libraryOpen} onClose={() => setLibraryOpen(false)} />
+
+      <Onboarding visible={showOnboarding} onDone={finishOnboarding} />
     </SafeAreaView>
   );
 }
@@ -1412,6 +1445,10 @@ const s = StyleSheet.create({
   modeToggleBtn: { width: 44, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.08)", justifyContent: "center", alignItems: "center" },
   modeToggleTxt: { fontSize: 16 },
   modeLabelBottom: { textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: 9, letterSpacing: 2, marginBottom: 2 },
+
+  // Stats strip (demo polish)
+  statsStrip: { position: "absolute", top: 56, alignSelf: "center", backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.15)" },
+  statsStripText: { color: "rgba(255,255,255,0.85)", fontSize: 11, fontWeight: "600" },
 
   // Score reveal (C-4)
   revealBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.85)", justifyContent: "center", padding: 16 },
